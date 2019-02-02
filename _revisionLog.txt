@@ -1,0 +1,8 @@
+11/16/2018
+	Change fUncertainty() to fsuCurve()
+	Make new function that reports meter-level + aggregate model diagnostics (R-Squared, RMSE, NMBE, FSU, etc.)
+
+11/14/2018
+	[COMPLETE] Fix yoy inclusion in regression when there is no installation date (or date exceeds sample period)
+	[COMPLETE] Fix yoy.adjust parameter so that it is not forced into get_dataFormat()
+	[COMPLETE] Remove lubridate dependency or correct package conflicts w/ data.table

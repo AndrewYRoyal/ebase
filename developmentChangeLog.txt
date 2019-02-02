@@ -1,0 +1,15 @@
+11/16/2018
+	(-) Added gradient boost predictions
+
+11/7/2018
+	(-) Added ability to make non-routine adjustments
+	(-) modified code to improve efficiency + output clarity
+	(-) made YoY adjustments optional
+	(-) Wrote vignette
+
+11/5/2018
+	(-) Modified baselineModel()
+	(-) Fixed YoY indicator to include only final month prior to installation
+	(-) Fixed postECM predictions
+		(+) Previous version used postECM means, new version correctly subsitutes baseline means
+	(-) YoY now optional-- omitted if base.length < 13 months
