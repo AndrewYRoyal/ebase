@@ -1,68 +1,69 @@
 #' Format Data
 #' @export
-formatData <- function(dt, id.var, use.var, date.var, hour.var, temp.var, install.date.var,
-                           nra.start.var, nra.end.var,
-                           base.length, date.format){
-  dt <- copy(dt)
-  fCall <- match.call(expand.dots = FALSE)
-  vnameSetV <- c('id.var', 'use.var', 'date.var', 'hour.var', 'temp.var', 'install.date.var', 'nra.start.var', 'nra.end.var')
-  vnameOldV <- as.character(unlist(fCall[names(fCall) %in% vnameSetV]))
-  names(vnameOldV) <- names(fCall[names(fCall) %in% vnameSetV])
-  vnameKeyV <- c(id.var = 'meterID', use.var = 'elct', date.var = 'date', hour.var = 'hr',
-                 temp.var = 'temp', install.date.var = 'inDate', nra.start.var = 'nraStart',
-                  nra.end.var = 'nraEnd')
-  vnameNewV <- vnameKeyV[names(vnameOldV)]
-  setnames(dt, vnameOldV, vnameNewV)
-  dt <- na.omit(dt, c('date', 'elct'))
+formatData <- function(
+  useDT, meterDT, base.length, date.format, padding){
+  useDT <- copy(useDT)
+  meterDT <- copy(meterDT)
 
-  if(!('nraStart' %in% names(dt))) dt[, nraStart:= as.POSIXct(NA)]
-  if(!('nraEnd' %in% names(dt))) dt[, nraEnd:= as.POSIXct(NA)]
-  if(is.character(dt[, date])) dt[, date:= as.POSIXct(date, format = date.format, tz = 'UTC')]
-  if(is.character(dt[, inDate])) dt[, inDate:= as.POSIXct(inDate, format = date.format, tz = 'UTC')]
-  if(is.character(dt[, nraStart])) dt[, nraStart:= as.POSIXct(nraStart, format = date.format, tz = 'UTC')]
-  if(is.character(dt[, nraEnd])) dt[, nraEnd:= as.POSIXct(nraEnd, format = date.format, tz = 'UTC')]
+  if(!('nraStart' %in% names(meterDT))) meterDT[, nraStart:= as.POSIXct(NA)]
+  if(!('nraEnd' %in% names(meterDT))) meterDT[, nraEnd:= as.POSIXct(NA)]
+  if(is.character(useDT[, date])) useDT[, date:= as.POSIXct(date, format = date.format, tz = 'UTC')]
+  if(is.character(meterDT[, inDate])) meterDT[, inDate:= as.POSIXct(inDate, format = date.format, tz = 'UTC')]
+  if(is.character(meterDT[, nraStart])) meterDT[, nraStart:= as.POSIXct(nraStart, format = date.format, tz = 'UTC')]
+  if(is.character(meterDT[, nraEnd])) meterDT[, nraEnd:= as.POSIXct(nraEnd, format = date.format, tz = 'UTC')]
 
-  mDatesDT <- unique(dt[, .(meterID, inDate, nraStart, nraEnd)])
-  for(r in unique(mDatesDT[, meterID])){
-    mDatesDT[meterID == r, blStartDate:= seq(inDate,
-                                             length = 2,
-                                             by = paste0("-", base.length, " months"))[2]]
-    mDatesDT[meterID == r, yoyDate:= seq(inDate,
-                                         length = 2,
-                                         by = paste0("-", 1, " months"))[2]]
-    mDatesDT[meterID == r, endDate:= seq(inDate,
-                                         length = 2,
-                                         by = paste0("+", 12, " months"))[2]]
+  for(meter in unique(meterDT[, meterID])){
+    meterDT[meterID == meter,
+            inStart:= seq(from = inDate,
+                          length = 2,
+                          by = paste0("-", padding, " days"))[2]]
+    meterDT[meterID == meter,
+            inEnd:= seq(from = inDate,
+                        length = 2,
+                        by = paste0("+", padding, " days"))[2]]
+    meterDT[meterID == meter,
+            blStart:= seq(from = inStart,
+                          length = 2,
+                          by = paste0("-", base.length, " months"))[2]]
+    meterDT[meterID == meter,
+            pEnd:= seq(inEnd,
+                        length = 2,
+                        by = paste0("+", 12, " months"))[2]]
   }
-  dt <- merge(
-    dt[, .(meterID, elct, date, hr, temp)],
-    mDatesDT)
 
-  maxDate <- max(dt[, date])
-  dt[is.na(nraEnd) & !is.na(nraStart), nraEnd:= maxDate]
-  dt[, baseline:= as.numeric(date >= blStartDate & date < inDate)]
-  dt[, postECM:= as.numeric(date >= inDate & date < endDate)]
-  dt[, nra:= as.numeric(date >= nraStart & date <= nraEnd)]
-  dt[, yoy:= as.numeric(date >= yoyDate)]
-  dt <- dt[baseline == 1 | postECM == 1, ]
+  datVarV <- intersect(
+    names(meterDT),
+    c('inStart', 'inEnd', 'blStart', 'pEnd', 'nraStart', 'nraEnd'))
+  meterDT <- meterDT[, c('meterID', datVarV), with = FALSE]
+  useDT <- merge(
+    useDT,
+    meterDT)
 
-  dt[, tbin:= pmin(ceiling(pmax(0, (temp - 50)/5)) + 1, 11)]
-  for(t in unique(dt[, tbin])) dt[, paste0('tbin', t):= as.numeric(tbin == t)]
-  dt[, c('mm', 'dow'):= list(month(date), wday(date))]
-  for(m in unique(dt[, mm])) dt[, paste0('mm', m):= as.numeric(mm == m)]
-  dt[, dHour:= .GRP, by = c('meterID', 'dow', 'hr')]
-  dt[, c('inDate', 'blStartDate', 'yoyDate', 'nraStart', 'nraEnd'):= NULL]
-  return(dt)
+  maxDate <- max(useDT[, date])
+  useDT[is.na(nraEnd) & !is.na(nraStart), nraEnd:= maxDate]
+  useDT <- useDT[date >= blStart & date <= pEnd, ]
+  useDT[, period:=
+          as.numeric(date >= blStart) +
+          as.numeric(date >= inStart) +
+          as.numeric(date >= inEnd)]
+  useDT[, period:= c('baseline', 'install', 'performance')[period]]
+  useDT[, tbin:= pmin(ceiling(pmax(0, (temp - 50)/5)) + 1, 11)]
+  for(t in unique(useDT[, tbin])) useDT[, paste0('tbin', t):= as.numeric(tbin == t)]
+  useDT[, c('mm', 'dow'):= list(month(date), wday(date))]
+  for(m in unique(useDT[, mm])) useDT[, paste0('mm', m):= as.numeric(mm == m)]
+  useDT[, dHour:= .GRP, by = c('meterID', 'dow', 'hr')]
+  useDT[, paste0('', datVarV):= NULL]
+  return(useDT)
 }
 
 #' Panel Regression
 #' @export
 panelReg <- function(dt, meterV){
   tbinV <- c('<50', seq(55, 70, 5), '', seq(80, 95, 5), '>95')
-  panelList <- lapply(meterV, function(x) panelModel(x, dt = dt))
-  modelFitV <- vapply(meterV,
-                         function(x) panelList[[x]]$r2, FUN.VALUE = numeric(1))
-  coefTableList <- lapply(panelList, function(x) coefTable(x))
+  modelList <- lapply(meterV, function(x) panelModel(x, dt = dt))
+  # modelFitV <- vapply(meterV,
+  #                        function(x) panelList[[x]]$r2, FUN.VALUE = numeric(1))
+  coefTableList <- lapply(modelList, function(x) coefTable(x))
   coefTableList <- lapply(
     names(coefTableList),
     function(x){
@@ -70,7 +71,7 @@ panelReg <- function(dt, meterV){
       setcolorder(coefTableList[[x]], c('meterID', 'coef', 'variable', 'value', 'stde', 'tvalue'))
     })
   coefTableDT <- rbindlist(coefTableList)
-  return(list(modelFit = modelFitV, coefTable = coefTableDT))
+  return(list(modelList = modelList, coefTable = coefTableDT))
 }
 
 #' Panel Model
@@ -78,12 +79,10 @@ panelReg <- function(dt, meterV){
 panelModel <- function(m, dt){
   regDT <- dt[meterID == m, ]
   tbinV <- unique(regDT[, tbin])[-5] # set intercept on 5th bin
-  yoyI <- uniqueN(regDT[baseline == 1, .(year(date), mm)]) > 12
   nraI <- 'nra' %in% names(regDT) && !anyNA(regDT[, nra])
 
   rForumula <- paste0('log(elct + .01)', '~',
                       paste0('tbin', tbinV, collapse = '+'),
-                      ifelse(yoyI, '+ yoy', ''),
                       ifelse(nraI, ' + nra', ''),
                       ' | dHour + mm | 0 | 0')
   out <- do.call('felm', list(as.formula(rForumula), data = as.name('regDT')))
@@ -121,7 +120,7 @@ get_pctTransform <- function(parameter, stde = NULL){
 
 #' Regression Predictions
 #' @export
-rPredict <- function(meter, dt, nra.est, yoy.adjust, base.length){
+rPredict <- function(meter, dt, nra.est){
   regDT <- dt[meterID == meter, ]
   mmV <- unique(regDT[, mm])[-1]
   tbinV <- unique(regDT[, tbin])[-5]
@@ -129,28 +128,30 @@ rPredict <- function(meter, dt, nra.est, yoy.adjust, base.length){
   rFormula <- paste0('elctDM ~',
                      paste0('mm', mmV, 'DM', collapse = '+'), '+',
                      paste0('tbin', tbinV, 'DM', collapse = '+'),
-                     ifelse(base.length > 11 & yoy.adjust, '+ yoy', ''),
                      ifelse(nra.est && !anyNA(dt[, nra]), '+ nra', ''))
-  varV <- as.list(c('elct', paste0('mm', mmV), paste0('tbin', tbinV), 'yoy'))
+  varV <- as.list(c('elct', paste0('mm', mmV), paste0('tbin', tbinV)))
   names(varV) <- varV
 
-  regDT[baseline == 1,
+  regDT[period == 'baseline',
         paste0(varV, 'm'):=
           lapply(varV,
                  function(x) mean(get(x), na.rm = TRUE)),
         by = .(dHour)]
   regDT <- merge(
     regDT,
-    unique(regDT[baseline == 1, c('dHour', paste0(varV, 'm')), with = FALSE]),
+    unique(regDT[period == 'baseline',
+                 c('dHour', paste0(varV, 'm')),
+                 with = FALSE]),
     by = 'dHour', suffixes = c('', '.pred'))
-  regDT[, paste0(varV, 'DM'):=
+  regDT[,
+        paste0(varV, 'DM'):=
           lapply(varV,
-                 function(x) get(x) - get(paste0(x, 'm.pred'))),
-     by = c('dHour', 'baseline', 'meterID')]
+                 function(x) get(x) - get(paste0(x, 'm.pred')))]
+        # by = c('dHour', 'baseline', 'meterID')]
 
-  est <- lm(rFormula, data = regDT[baseline == 1, ])
+  est <- lm(rFormula, data = regDT[period == 'baseline', ])
   regDT[, pElct:= elctm.pred + predict(est, regDT)]
-  return(regDT[,.(meterID, date, hr, pElct)])
+  return(regDT[, .(meterID, date, hr, pElct)])
 }
 #' Gradient Boost Predictions
 #' @export
@@ -159,32 +160,33 @@ mlPredict <- function(meter, dt, nra.est){
   regDT <- regDT[, dHour:= as.factor(dHour)]
   mmV <- unique(regDT[, mm])[-1]
 
-  keepV <- c('meterID', 'elct', 'baseline', 'date', 'hr', 'temp', 'dHour', paste0('mm', mmV))
+  keepV <- c('meterID', 'elct', 'period', 'date', 'hr', 'temp', 'dHour', paste0('mm', mmV))
   if(nra.est && !anyNA(regDT[, nra])) keepV <- c(keepV, 'nra')
   regDT <- regDT[, keepV, with = FALSE]
 
   baselineM <- xgb.DMatrix(
-    data = sparse.model.matrix(elct ~ ., data = regDT[baseline == 1, -c('meterID', 'baseline', 'date', 'hr')]),
-    label = regDT[baseline == 1, elct]
+    data = sparse.model.matrix(elct ~ ., data = regDT[period == 'baseline',
+                                                      -c('meterID', 'period', 'date', 'hr')]),
+    label = regDT[period == 'baseline', elct]
   )
 
   cb.cv.predict(save_models = TRUE)
   nIterate <- xgb.cv(data = baselineM,
-                     nfold = 10, max_depth = 6, eta = .5, nthread = 8, nrounds = 2000,
+                     nfold = 10, max_depth = 8, eta = .5, nthread = 8, nrounds = 2000,
                      early_stopping_rounds = 5, objective = 'reg:linear', verbose = 0)$best_iteration
   gbModel <- xgboost(data = baselineM,
-                     max_depth = 6, eta = .5, nthread = 8, nrounds = nIterate,
+                     max_depth = 8, eta = .5, nthread = 8, nrounds = nIterate,
                      early_stopping_rounds = 5, objective = 'reg:linear', verbose = 0)
-  regDT[baseline == 1, MLpElct:= predict(gbModel, baselineM)]
+  regDT[period == 'baseline', MLpElct:= predict(gbModel, baselineM)]
 
-  if(uniqueN(regDT[baseline == 0, ]) > 30){
-    postM <- xgb.DMatrix(
-      data = sparse.model.matrix(elct ~ ., data = regDT[baseline == 0, -c('meterID', 'baseline', 'date', 'hr', 'MLpElct')]),
-      label = regDT[baseline == 0, elct]
+  if(uniqueN(regDT[period != 'baseline', ]) > 30){
+    perfM <- xgb.DMatrix(
+      data = sparse.model.matrix(elct ~ ., data = regDT[period != 'baseline',
+                                                        -c('meterID', 'period', 'date', 'hr', 'MLpElct')]),
+      label = regDT[period != 'baseline', elct]
     )
-    regDT[baseline == 0, MLpElct:= predict(gbModel, postM)]
+    regDT[period != 'baseline', MLpElct:= predict(gbModel, perfM)]
   }
-
   return(regDT[, .(meterID, date, hr, MLpElct)])
 }
 
