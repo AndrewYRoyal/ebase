@@ -119,7 +119,7 @@ summary.baseline <- function(x, oHours = NULL){
   NMBE <- function(actual, predicted) format(100*sum(predicted - actual)/
                                                sum(actual), digits = 1)
   sumMeterDT <- merge(
-    meterDT,
+    meterDT[, .(meterID)],
     predDT[period == 'baseline',
            list(
              R2_GB = R2(elct, MLpElct),
@@ -144,7 +144,7 @@ summary.baseline <- function(x, oHours = NULL){
   sumPropertyDT <- NA
   if('propertyName' %in% names(meterDT)){
     sumPropertyDT <- merge(
-      meterDT,
+      meterDT[, .(meterID, propertyName)],
       predDT,
       by = 'meterID')[period == 'baseline',
       lapply(
@@ -159,7 +159,8 @@ summary.baseline <- function(x, oHours = NULL){
                       CVRMSE_GB = CVRMSE(elct, MLpElct),
                       CVRMSE_R = CVRMSE(elct, pElct),
                       NMBE_GB = NMBE(elct, MLpElct),
-                      NMBE_R = NMBE(elct, pElct)),
+                      NMBE_R = NMBE(elct, pElct),
+                      `Annual kWh` = sum(elct)),
                     by = .(propertyName)]
     sumPropertyDT <- merge(
       sumPropertyDT,
@@ -171,20 +172,9 @@ summary.baseline <- function(x, oHours = NULL){
       by = 'propertyName')
   }
 
-  # for(r in names(uFunList)) modelDT[meterID == r, Frac_U:= round(100*uFunList[[r]](m = baseDays*24, t = 1, f = 0.05), 0)]
-  # modelDT <- merge(modelDT, x$trend[variable == 'est', .(meterID, YoY = round(100*value))],
-  #                  by = 'meterID')
-  # if(is.data.table(x$NRAdjust)){
-  #   modelDT <- merge(modelDT, x$NRAdjust[variable == 'est', .(meterID, NRA = round(100*value))],
-  #                    by = 'meterID', all.x = TRUE)
-  # }
   return(list(
-    summaryMeter = sumMeterDT[,
-                              .(meterID, Savings_GB, Savings_R, CVRMSE_GB, CVRMSE_R, R2_GB, R2_R,
-                                baselineDays, performanceDays)],
-    summaryProperty = sumPropertyDT[,
-                                    .(propertyName, Savings_GB, Savings_R, CVRMSE_GB, CVRMSE_R,
-                                      R2_GB, R2_R)]))
+    summaryMeter = sumMeterDT,
+    summaryProperty = sumPropertyDT))
 }
 
 #' Truncated Savings
