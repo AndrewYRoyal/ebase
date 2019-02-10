@@ -128,7 +128,7 @@ summary.baseline <- function(x, oHours = NULL){
              CVRMSE_R = CVRMSE(elct, pElct),
              NMBE_GB = NMBE(elct, MLpElct),
              NMBE_R = NMBE(elct, pElct),
-             baselinedays = round(.N/24, 0),
+             baselineDays = round(.N/24, 0),
              `Annual kWh` = sum(elct)),
            by = .(meterID)],
     by = 'meterID')
@@ -179,8 +179,12 @@ summary.baseline <- function(x, oHours = NULL){
   #                    by = 'meterID', all.x = TRUE)
   # }
   return(list(
-    summaryMeter = sumMeterDT,
-    summaryProperty = sumPropertyDT))
+    summaryMeter = sumMeterDT[,
+                              .(meterID, Savings_GB, Savings_R, CVRMSE_GB, CVRMSE_R, R2_GB, R2_R,
+                                baselineDays, performanceDays)],
+    summaryProperty = sumPropertyDT[,
+                                    .(propertyName, Savings_GB, Savings_R, CVRMSE_GB, CVRMSE_R,
+                                      R2_GB, R2_R)]))
 }
 
 #' Truncated Savings
