@@ -4,10 +4,8 @@
 \alias{baselineModel}
 \title{Baseline Model}
 \usage{
-baselineModel(dt, id.var, use.var, date.var, hour.var, temp.var,
-  install.date.var, nra.start.var = NULL, nra.end.var = NULL,
-  base.length = NULL, date.format = NULL, yoy.adjust = NULL,
-  include.gboost = NULL)
+baselineModel(useDT, meterDT, base.length = 12,
+  date.format = "\%m/\%d/\%Y", gboost = FALSE, padding = 0)
 }
 \description{
 Baseline Model

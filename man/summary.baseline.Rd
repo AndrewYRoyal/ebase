@@ -4,7 +4,7 @@
 \alias{summary.baseline}
 \title{Model Summary Table}
 \usage{
-\method{summary}{baseline}(x, meterTable = NULL)
+\method{summary}{baseline}(x, oHours = NULL)
 }
 \description{
 Model Summary Table

@@ -4,7 +4,7 @@
 \alias{rPredict}
 \title{Regression Predictions}
 \usage{
-rPredict(meter, dt, nra.est, yoy.adjust, base.length)
+rPredict(meter, dt, nra.est)
 }
 \description{
 Regression Predictions

@@ -4,8 +4,7 @@
 \alias{formatData}
 \title{Format Data}
 \usage{
-formatData(dt, id.var, use.var, date.var, hour.var, temp.var,
-  install.date.var, nra.start.var, nra.end.var, base.length, date.format)
+formatData(useDT, meterDT, base.length, date.format, padding)
 }
 \description{
 Format Data

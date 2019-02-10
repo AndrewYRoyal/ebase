@@ -2,10 +2,10 @@
 % Please edit documentation in R/mainFunctions.R
 \name{plot.baseline}
 \alias{plot.baseline}
-\title{Plot Results}
+\title{Daily Load Profile}
 \usage{
-\method{plot}{baseline}(x, type = "dailyload", ...)
+\method{plot}{baseline}(x, gboost = FALSE, ...)
 }
 \description{
-Plot Results
+Daily Load Profile
 }

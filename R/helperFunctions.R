@@ -37,7 +37,8 @@ formatData <- function(
   meterDT <- meterDT[, c('meterID', datVarV), with = FALSE]
   useDT <- merge(
     useDT,
-    meterDT)
+    meterDT,
+    by = 'meterID')
 
   maxDate <- max(useDT[, date])
   useDT[is.na(nraEnd) & !is.na(nraStart), nraEnd:= maxDate]
