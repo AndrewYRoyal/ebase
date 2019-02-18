@@ -192,6 +192,7 @@ truncated_savings <- function(x){
     by = 'meterID')
   meterSave[is.na(oStart), c('oStart', 'oEnd'):= list(0, 23)]
   meterSave[, operating:= mapply(opHour, hr = hr, start = oStart, end = oEnd)]
+  if(!('MLpElct' %in% names(meterSave))) meterSave[, MLpElct:= NA]
 
   meterSave <- meterSave[operating == TRUE, list(
     TSavings_GB = sum(MLpElct - elct),
