@@ -102,110 +102,121 @@ plot.baseline <- function(x, gboost = FALSE, ...){
 }
 
 
-
 #' Model Summary Table
 #' @import data.table
 #' @import stats
 #' @export
-summary.baseline <- function(x, oHours = NULL){
+summary.baseline <- function(x, GBoost = FALSE){
   meterDT <- copy(x$meterDT)
   predDT <- copy(x$predictions)
 
-  if(!('MLpElct' %in% names(predDT))) predDT[, MLpElct:= NA]
-  R2 <- function(actual, predicted) round(1 - sum((actual - predicted)^2)/
-                                                sum((actual - mean(actual))^2), 2)
-  CVRMSE <- function(actual, predicted) round(100*sqrt(mean((actual - predicted)^2))/
-                                                mean(actual), 0)
-  NMBE <- function(actual, predicted) format(100*sum(predicted - actual)/
-                                               sum(actual), digits = 1)
+  if(!('MLpElct' %in% names(predDT)) | !GBoost){
+    GBoost <- FALSE
+    cat('Calculating regression savings... \n')
+  } else{
+    predDT[, pElct:= MLpElct]
+    cat('Calculating GBoost savings... \n')
+  }
+  R2 <- function(actual, predicted){
+    round(1 - sum((actual - predicted)^2)/sum((actual - mean(actual))^2), 2)
+  }
+  CVRMSE <- function(actual, predicted){
+    round(100*sqrt(mean((actual - predicted)^2))/mean(actual), 0)
+  }
+  NMBE <- function(actual, predicted){
+    format(100*sum(predicted - actual)/sum(actual), digits = 1)
+  }
+  varCalc <- function(actual, predicted){
+    sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
+      sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
+  }
+  adjustedN <- function(x, n){
+    corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
+    (1 - corr)/(1 + corr)
+  }
+
   sumMeterDT <- merge(
     meterDT[, .(meterID)],
     predDT[period == 'baseline',
            list(
-             R2_GB = R2(elct, MLpElct),
-             R2_R = R2(elct, pElct),
-             CVRMSE_GB = CVRMSE(elct, MLpElct),
-             CVRMSE_R = CVRMSE(elct, pElct),
-             NMBE_GB = NMBE(elct, MLpElct),
-             NMBE_R = NMBE(elct, pElct),
+             R2 = R2(elct, pElct),
+             CVRMSE = CVRMSE(elct, pElct),
+             NMBE = NMBE(elct, pElct),
              baselineDays = round(.N/24, 0),
-             `Annual kWh` = sum(elct)),
+             AnnualkWh = sum(elct)),
            by = .(meterID)],
     by = 'meterID')
+
   sumMeterDT <- merge(
     sumMeterDT,
     predDT[period == 'performance',
            list(
-             Savings_GB = sum(MLpElct - elct),
-             Savings_R = sum(pElct - elct),
+             Savings = sum(pElct - elct),
+             varSavings = varCalc(elct, pElct),
              performanceDays = round(.N/24, 0)),
            by = .(meterID)],
     by = 'meterID')
+
   sumPropertyDT <- NA
   if('propertyName' %in% names(meterDT)){
     sumPropertyDT <- merge(
       meterDT[, .(meterID, propertyName)],
       predDT,
-      by = 'meterID')[period == 'baseline',
-      lapply(
-        list(elct = elct, pElct = pElct, MLpElct = MLpElct),
-        sum),
-      by = .(propertyName, date, hr)]
-    sumPropertyDT <-
-      sumPropertyDT[,
-                    list(
-                      R2_GB = R2(elct, MLpElct),
-                      R2_R = R2(elct, pElct),
-                      CVRMSE_GB = CVRMSE(elct, MLpElct),
-                      CVRMSE_R = CVRMSE(elct, pElct),
-                      NMBE_GB = NMBE(elct, MLpElct),
-                      NMBE_R = NMBE(elct, pElct),
-                      `Annual kWh` = sum(elct)),
-                    by = .(propertyName)]
+      by = 'meterID')[period == 'baseline', lapply(.SD, sum),
+                      .SDcols = c('elct', 'pElct'),
+                      by = .(propertyName, date, hr)]
+
+    sumPropertyDT <- sumPropertyDT[, list(
+      R2 = R2(elct, pElct),
+      CVRMSE = CVRMSE(elct, pElct),
+      NMBE = NMBE(elct, pElct),
+      AnnualkWh = sum(elct)),
+      by = .(propertyName)]
+
     sumPropertyDT <- merge(
       sumPropertyDT,
       merge(
-        sumMeterDT[, .(meterID, Savings_R, Savings_GB)],
-        meterDT[, .(propertyName, meterID)])[, list(Savings_GB = sum(Savings_GB),
-                                                    Savings_R = sum(Savings_R)),
+        sumMeterDT[, .(meterID, Savings, varSavings)],
+        meterDT[, .(propertyName, meterID)])[, lapply(.SD, sum),
+                                             .SDcols = c('Savings', 'varSavings'),
                                              by = .(propertyName)],
       by = 'propertyName')
   }
-
   return(list(
     summaryMeter = sumMeterDT,
     summaryProperty = sumPropertyDT))
 }
 
+
 #' Truncated Savings
 #' @import data.table
 #' @import stats
 #' @export
-truncated_savings <- function(x){
-  if(length(setdiff(c('oStart', 'oEnd'), names(x$meterDT))) > 1) stop('No oStart or oEnd in meterDT.')
-
-  opHour <- function(hr, start, end) hr %in% unique(c(seq(start, min(end, 23)), seq(0, end)))
-
-  meterSave <- merge(
-    x$meterDT[, .(meterID, propertyName, oStart, oEnd)],
-    x$predictions[period == 'performance', ],
-    by = 'meterID')
-  meterSave[is.na(oStart), c('oStart', 'oEnd'):= list(0, 23)]
-  meterSave[, operating:= mapply(opHour, hr = hr, start = oStart, end = oEnd)]
-  if(!('MLpElct' %in% names(meterSave))) meterSave[, MLpElct:= NA]
-
-  meterSave <- meterSave[operating == TRUE, list(
-    TSavings_GB = sum(MLpElct - elct),
-    TSavings_R = sum(pElct - elct)),
-    by = .(meterID, propertyName)]
-  propertySave <- meterSave[, lapply(
-    list(TSavings_R = TSavings_R, TSavings_GB = TSavings_GB),
-    sum),
-    by = .(propertyName)]
-  return(list(
-    meter = meterSave[, .(meterID, TSavings_GB, TSavings_R)],
-    property = propertySave))
-}
+# truncated_savings <- function(x){
+#   if(length(setdiff(c('oStart', 'oEnd'), names(x$meterDT))) > 1) stop('No oStart or oEnd in meterDT.')
+#
+#   opHour <- function(hr, start, end) hr %in% unique(c(seq(start, min(end, 23)), seq(0, end)))
+#
+#   meterSave <- merge(
+#     x$meterDT[, .(meterID, propertyName, oStart, oEnd)],
+#     x$predictions[period == 'performance', ],
+#     by = 'meterID')
+#   meterSave[is.na(oStart), c('oStart', 'oEnd'):= list(0, 23)]
+#   meterSave[, operating:= mapply(opHour, hr = hr, start = oStart, end = oEnd)]
+#   if(!('MLpElct' %in% names(meterSave))) meterSave[, MLpElct:= NA]
+#
+#   meterSave <- meterSave[operating == TRUE, list(
+#     TSavings_GB = sum(MLpElct - elct),
+#     TSavings_R = sum(pElct - elct)),
+#     by = .(meterID, propertyName)]
+#   propertySave <- meterSave[, lapply(
+#     list(TSavings_R = TSavings_R, TSavings_GB = TSavings_GB),
+#     sum),
+#     by = .(propertyName)]
+#   return(list(
+#     meter = meterSave[, .(meterID, TSavings_GB, TSavings_R)],
+#     property = propertySave))
+# }
 
 
 

@@ -154,6 +154,7 @@ rPredict <- function(meter, dt, nra.est){
   regDT[, pElct:= elctm.pred + predict(est, regDT)]
   return(regDT[, .(meterID, date, hr, pElct)])
 }
+
 #' Gradient Boost Predictions
 #' @export
 mlPredict <- function(meter, dt, nra.est){
@@ -173,11 +174,11 @@ mlPredict <- function(meter, dt, nra.est){
 
   cb.cv.predict(save_models = TRUE)
   nIterate <- xgb.cv(data = baselineM,
-                     nfold = 10, max_depth = 8, eta = .5, nthread = 8, nrounds = 2000,
-                     early_stopping_rounds = 5, objective = 'reg:linear', verbose = 0)$best_iteration
+                     nfold = 5, max_depth = 5, eta = .1, nthread = 8, nrounds = 2000,
+                     early_stopping_rounds = 3, objective = 'reg:linear', verbose = 0)$best_iteration
   gbModel <- xgboost(data = baselineM,
-                     max_depth = 8, eta = .5, nthread = 8, nrounds = nIterate,
-                     early_stopping_rounds = 5, objective = 'reg:linear', verbose = 0)
+                     max_depth = 5, eta = .1, nthread = 8, nrounds = nIterate,
+                     early_stopping_rounds = 3, objective = 'reg:linear', verbose = 0)
   regDT[period == 'baseline', MLpElct:= predict(gbModel, baselineM)]
 
   if(uniqueN(regDT[period != 'baseline', ]) > 30){
