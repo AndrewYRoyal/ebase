@@ -226,44 +226,44 @@ summary.baseline <- function(x, GBoost = FALSE){
 #' @import stats
 #' @import ggplot2
 #' @export
-fUncertainty <- function(dt, fSavings, tstat = 1, export.path = NULL){
-  meterV <- unique(dt[, meterID]); names(meterV) <- meterV
-  uFunList <- get_uFunList(dt = dt)
-  obs <- max(sapply(meterV, function(r) uniqueN(dt[meterID == r & baseline == 1, ]))) # Taking max # of observations across meters
-
-  outDT <- data.table(m = rep(1:obs, times = length(fSavings)),
-                      t = rep(tstat, times = obs*length(fSavings)),
-                      f = rep(fSavings, each = obs))
-
-  for(u in names(uFunList)) outDT[, paste0('', u):= mapply(uFunList[[u]], m, t, f, SIMPLIFY = TRUE)]
-  outDT <- melt(outDT, id.vars = c('m', 't', 'f'), value.name = 'fUncertainty', variable.name = 'meterID')
-  outDT[, f:= as.factor(f)]
-
-  breaksV <- seq(30*24, 365*24, 30*24)
-  labelsV <- as.character(breaksV/24)
-  cPallete <- c('steelblue1', 'steelblue3', 'royalblue2', 'royalblue4', 'blue4')
-
-  plotList <- lapply(meterV, function(r){
-    ggplot(data  = outDT[inrange(m, 30*24, 365*24) & meterID == r, ], aes(x = m, y = fUncertainty, color = f)) +
-      theme_light(base_size = 12) +
-      theme(axis.text = element_text(angle = 40)) +
-      geom_line(size = 1.5) +
-      scale_y_continuous('Fractional Uncertainty', breaks = 1:10/10, labels = as.character(1:10/10)) +
-      scale_x_continuous('Post-ECM Days', breaks = breaksV, labels = labelsV) +
-      scale_color_manual('Savings', values = cPallete) +
-      geom_hline(yintercept = 0.5, size = 1.5, linetype = 2) +
-      ggtitle('Model Uncertainty', paste0('Meter ', r))
-  })
-
-  if(!is.null(export.path)){
-    for(r in meterV){
-      ggsave(plotList[[r]], filename = paste0(export.path, '/fU_', grep(r, meterV), '.pdf'),
-             width = 10, height = 6)
-    }
-  }
-
-  return(list(table = outDT,
-              plots = plotList))
-}
+# fUncertainty <- function(dt, fSavings, tstat = 1, export.path = NULL){
+#   meterV <- unique(dt[, meterID]); names(meterV) <- meterV
+#   uFunList <- get_uFunList(dt = dt)
+#   obs <- max(sapply(meterV, function(r) uniqueN(dt[meterID == r & baseline == 1, ]))) # Taking max # of observations across meters
+#
+#   outDT <- data.table(m = rep(1:obs, times = length(fSavings)),
+#                       t = rep(tstat, times = obs*length(fSavings)),
+#                       f = rep(fSavings, each = obs))
+#
+#   for(u in names(uFunList)) outDT[, paste0('', u):= mapply(uFunList[[u]], m, t, f, SIMPLIFY = TRUE)]
+#   outDT <- melt(outDT, id.vars = c('m', 't', 'f'), value.name = 'fUncertainty', variable.name = 'meterID')
+#   outDT[, f:= as.factor(f)]
+#
+#   breaksV <- seq(30*24, 365*24, 30*24)
+#   labelsV <- as.character(breaksV/24)
+#   cPallete <- c('steelblue1', 'steelblue3', 'royalblue2', 'royalblue4', 'blue4')
+#
+#   plotList <- lapply(meterV, function(r){
+#     ggplot(data  = outDT[inrange(m, 30*24, 365*24) & meterID == r, ], aes(x = m, y = fUncertainty, color = f)) +
+#       theme_light(base_size = 12) +
+#       theme(axis.text = element_text(angle = 40)) +
+#       geom_line(size = 1.5) +
+#       scale_y_continuous('Fractional Uncertainty', breaks = 1:10/10, labels = as.character(1:10/10)) +
+#       scale_x_continuous('Post-ECM Days', breaks = breaksV, labels = labelsV) +
+#       scale_color_manual('Savings', values = cPallete) +
+#       geom_hline(yintercept = 0.5, size = 1.5, linetype = 2) +
+#       ggtitle('Model Uncertainty', paste0('Meter ', r))
+#   })
+#
+#   if(!is.null(export.path)){
+#     for(r in meterV){
+#       ggsave(plotList[[r]], filename = paste0(export.path, '/fU_', grep(r, meterV), '.pdf'),
+#              width = 10, height = 6)
+#     }
+#   }
+#
+#   return(list(table = outDT,
+#               plots = plotList))
+# }
 
 
