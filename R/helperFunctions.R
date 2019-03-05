@@ -1,7 +1,7 @@
 #' Format Data
 #' @export
 formatData <- function(
-  useDT, meterDT, base.length, date.format, padding){
+  useDT, meterDT, modeledMeters, base.length, date.format, padding){
   useDT <- copy(useDT)
   meterDT <- copy(meterDT)
 

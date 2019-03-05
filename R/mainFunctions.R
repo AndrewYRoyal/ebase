@@ -25,7 +25,6 @@ baselineModel <- function(
   meterV <- unique(out[, meterID])
   names(meterV) <- meterV
   panelRegList <- panelReg(dt = out, meterV = meterV)
-
   nra.est <- 'nra' %in% names(out)
   rPredDT <- rbindlist(
     lapply(meterV,
@@ -35,7 +34,6 @@ baselineModel <- function(
     out,
     rPredDT,
     by = c('meterID', 'date', 'hr'), all.x = TRUE)
-
   if(gboost){
     mlPredDT <- rbindlist(
       lapply(meterV,
@@ -47,7 +45,6 @@ baselineModel <- function(
       by = c('meterID', 'date', 'hr'),
       all.x = TRUE)
   }
-
   out[, c('dHour', 'tbin'):= NULL]
   dropV <- grep('.*(?=\\d)', names(out), perl = TRUE, value = TRUE)
   out <- out[, setdiff(names(out), dropV), with = FALSE][order(meterID, date, hr)]
@@ -118,15 +115,19 @@ summary.baseline <- function(x, GBoost = FALSE){
     cat('Calculating GBoost savings... \n')
   }
   R2 <- function(actual, predicted){
+    actual <- na.omit(actual); predicted <- na.omit(predicted)
     round(1 - sum((actual - predicted)^2)/sum((actual - mean(actual))^2), 2)
   }
   CVRMSE <- function(actual, predicted){
+    actual <- na.omit(actual); predicted <- na.omit(predicted)
     round(100*sqrt(mean((actual - predicted)^2))/mean(actual), 0)
   }
   NMBE <- function(actual, predicted){
+    actual <- na.omit(actual); predicted <- na.omit(predicted)
     format(100*sum(predicted - actual)/sum(actual), digits = 1)
   }
   varCalc <- function(actual, predicted){
+    actual <- na.omit(actual); predicted <- na.omit(predicted)
     sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
       sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
   }
@@ -177,7 +178,7 @@ summary.baseline <- function(x, GBoost = FALSE){
       sumPropertyDT,
       merge(
         sumMeterDT[, .(meterID, Savings, varSavings)],
-        meterDT[, .(propertyName, meterID)])[, lapply(.SD, sum),
+        meterDT[, .(propertyName, meterID)])[, lapply(.SD, sum, na.rm = TRUE),
                                              .SDcols = c('Savings', 'varSavings'),
                                              by = .(propertyName)],
       all.x = TRUE, all.y = TRUE, by = 'propertyName')
