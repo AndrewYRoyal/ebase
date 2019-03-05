@@ -145,7 +145,7 @@ summary.baseline <- function(x, GBoost = FALSE){
              baselineDays = round(.N/24, 0),
              AnnualkWh = sum(elct)),
            by = .(meterID)],
-    by = 'meterID')
+    all.x = TRUE, by = 'meterID')
 
   sumMeterDT <- merge(
     sumMeterDT,
@@ -155,16 +155,16 @@ summary.baseline <- function(x, GBoost = FALSE){
              varSavings = varCalc(elct, pElct),
              performanceDays = round(.N/24, 0)),
            by = .(meterID)],
-    by = 'meterID')
+    all.x = TRUE, by = 'meterID')
 
   sumPropertyDT <- NA
   if('propertyName' %in% names(meterDT)){
     sumPropertyDT <- merge(
       meterDT[, .(meterID, propertyName)],
       predDT,
-      by = 'meterID')[period == 'baseline', lapply(.SD, sum),
-                      .SDcols = c('elct', 'pElct'),
-                      by = .(propertyName, date, hr)]
+      all.x = TRUE, by = 'meterID')[period == 'baseline', lapply(.SD, sum),
+                                    .SDcols = c('elct', 'pElct'),
+                                    by = .(propertyName, date, hr)]
 
     sumPropertyDT <- sumPropertyDT[, list(
       R2 = R2(elct, pElct),
@@ -180,7 +180,7 @@ summary.baseline <- function(x, GBoost = FALSE){
         meterDT[, .(propertyName, meterID)])[, lapply(.SD, sum),
                                              .SDcols = c('Savings', 'varSavings'),
                                              by = .(propertyName)],
-      by = 'propertyName')
+      all.x = TRUE, all.y = TRUE, by = 'propertyName')
   }
   return(list(
     summaryMeter = sumMeterDT,
