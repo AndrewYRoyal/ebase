@@ -47,11 +47,13 @@ ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
   getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
   if(!is.null(base.min)){
     baseDropV <- useDT[period == 'baseline', getDays(date) > base.min, by = .(meterID)][V1 == FALSE, meterID]
+    baseDropV <- c(baseDropV, setdiff(unique(useDT[, meterID]), unique(useDT[period == 'baseline', meterID]))
   }
   if(!is.null(perf.min)){
     perfDropV <- useDT[period == 'performance', getDays(date) > perf.min, by = .(meterID)][V1 == FALSE, meterID]
+    perfDropV <- c(perfDropV, setdiff(unique(useDT[, meterID]), unique(useDT[period == 'performance', meterID]))
   }
-  useDT <- useDT[!(meterID %in% c(baseDropV, perfDropV))]
+  useDT <- useDT[!(meterID %in% c(baseDropV, perfDropV)), ]
   useDT[, tow:= .GRP, by = .(wday(date), hour(date))]
   useDT[, (datVarV):= NULL]
   meterV <- unique(useDT[, meterID]); names(meterV) <- meterV
