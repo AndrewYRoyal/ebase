@@ -92,7 +92,7 @@ ebModel.ebHourly <- function(ebDat, type = 'reg'){
     gboost <- function(meter){
       x <- dat[meterID == meter, ]
       t <- length(x[period == 'baseline', date])
-      blockFactor <- factor(c(rep(1, t/2), rep(2, t/2)))
+      blockFactor <- factor(sort(rep(1:2, t)[1:t]))
       regTask <- makeRegrTask(id = 'reg',
                               data = as.data.frame(x[period == 'baseline',
                                                      -c('meterID', 'date', 'period')]),
