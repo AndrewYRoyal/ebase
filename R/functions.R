@@ -133,7 +133,7 @@ gboost <- function(meter, dat, pSet, option){
     makeDiscreteParam('early_stopping_rounds', values = pSet$early_stopping_rounds),
     makeDiscreteParam('eta', values = pSet$eta))
   ctrl <- makeTuneControlGrid()
-  rSampleDesc <- makeResampleDesc('CV', iter = 2)
+  rSampleDesc <- makeResampleDesc('CV', iter = pSet$blocks)
   tuner <- tuneParams(
     learner = 'regr.xgboost',
     task = regTask,
