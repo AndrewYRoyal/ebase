@@ -73,13 +73,13 @@ ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
 
 #' Model
 #' @export
-ebModel <- function(x, type) UseMethod('ebModel')
+ebModel <- function(ebDat, type, option) UseMethod('ebModel')
 
 #' Hourly Model
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel.ebHourly <- function(ebDat, type = 'reg'){
+ebModel.ebHourly <- function(ebDat, type = 'reg', option = NULL){
   if(!(type %in% c('reg', 'GBoost'))) stop('Improper model type selected.')
   dat <- copy(ebDat$dat)
   if(type == 'reg'){
@@ -89,45 +89,67 @@ ebModel.ebHourly <- function(ebDat, type = 'reg'){
                         function(meter) regModel(meter = meter, dat = dat, varV = varV))
     structure(list(modelList = modelList, varV = varV), class = 'reg')
   } else if(type == 'GBoost'){
-    gboost <- function(meter){
-      x <- dat[meterID == meter, ]
-      t <- length(x[period == 'baseline', date])
-      blockFactor <- factor(sort(rep(1:2, t)[1:t]))
-      regTask <- makeRegrTask(id = 'reg',
-                              data = as.data.frame(x[period == 'baseline',
-                                                     -c('meterID', 'date', 'period')]),
-                              target = 'elct',
-                              blocking = blockFactor)
-      paramSpace <- makeParamSet(
-        makeDiscreteParam('max_depth', values = 3),
-        makeDiscreteParam('nrounds', values = c(200, 400, 600, 800, 1000, 1200, 1400)),
-        makeDiscreteParam('early_stopping_rounds', values = 5),
-        makeDiscreteParam('eta', values = .1))
-      ctrl <- makeTuneControlGrid()
-      rSampleDesc <- makeResampleDesc('CV', iter = 2)
-      tuner <- tuneParams(
-        learner = 'regr.xgboost',
-        task = regTask,
-        resampling = rSampleDesc,
-        par.set = paramSpace,
-        control = ctrl,
-        show.info = FALSE)
-      xgbLearn <- setHyperPars(
-        makeLearner('regr.xgboost', verbose = 0, nthread = 8),
-        par.vals = tuner$x)
-      xgbModel <- train(learner = xgbLearn, task = regTask)
-      xgbModel
-    }
-    parallelMap::parallelStart(mode = 'socket', cpus = 4, level = 'mlr.tuneParams')
+    pSet <- list(max_depth = 3,
+                 nrounds = seq(200, 1400, 200),
+                 early_stopping_rounds = 5,
+                 eta = 0.1,
+                 blocks = 2,
+                 cpus = 4)
+    if(!is.null(option$max_depth)) pSet$max_depth <- option$max_depth
+    if(!is.null(option$nrounds)) pSet$nrounds <- option$nrounds
+    if(!is.null(option$early_stopping_rounds)) pSet$early_stopping_rounds <- option$early_stopping_rounds
+    if(!is.null(option$eta)) pSet$eta <- option$eta
+    if(!is.null(option$blocks)) pSet$blocks <- option$blocks
+    if(!is.null(option$cpus)) pSet$cpus <- option$cpus
+
+    parallelMap::parallelStart(mode = 'socket', cpus = cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
-        modelList <- lapply(ebDat$meterV, function(meter) gboost(meter))
+        modelList <- lapply(ebDat$meterV, function(meter) gboost(meter, dat = dat, pSet = pSet))
       )
     })
     parallelMap::parallelStop()
     structure(list(modelList = modelList), class = 'GBoost')
   }
 }
+
+#' GBoost Model Helper
+#' @import data.table
+#' @import mlr
+#' @export
+
+gboost <- function(meter, dat, pSet, option){
+  x <- dat[meterID == meter, ]
+  t <- length(x[period == 'baseline', date])
+  blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
+  regTask <- makeRegrTask(id = 'reg',
+                          data = as.data.frame(x[period == 'baseline',
+                                                 -c('meterID', 'date', 'period')]),
+                          target = 'elct',
+                          blocking = blockFactor)
+  paramSpace <- makeParamSet(
+    makeDiscreteParam('max_depth', values = pSet$max_depth),
+    makeDiscreteParam('nrounds', values = pSet$nrounds),
+    makeDiscreteParam('early_stopping_rounds', values = pSet$early_stopping_rounds),
+    makeDiscreteParam('eta', values = pSet$eta))
+  ctrl <- makeTuneControlGrid()
+  rSampleDesc <- makeResampleDesc('CV', iter = 2)
+  tuner <- tuneParams(
+    learner = 'regr.xgboost',
+    task = regTask,
+    resampling = rSampleDesc,
+    par.set = paramSpace,
+    control = ctrl,
+    show.info = FALSE)
+  xgbLearn <- setHyperPars(
+    makeLearner('regr.xgboost', verbose = 0, nthread = 8),
+    par.vals = tuner$x)
+  xgbModel <- train(learner = xgbLearn, task = regTask)
+  xgbModel
+}
+
+
+
 
 #' Predictions
 #' @export
