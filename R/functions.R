@@ -102,7 +102,7 @@ ebModel.ebHourly <- function(ebDat, type = 'reg', option = NULL){
     if(!is.null(option$blocks)) pSet$blocks <- option$blocks
     if(!is.null(option$cpus)) pSet$cpus <- option$cpus
 
-    parallelMap::parallelStart(mode = 'socket', cpus = cpus, level = 'mlr.tuneParams')
+    parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
         modelList <- lapply(ebDat$meterV, function(meter) gboost(meter, dat = dat, pSet = pSet))
