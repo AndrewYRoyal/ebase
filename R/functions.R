@@ -3,92 +3,69 @@
 #' @export
 ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
                          base.min = NULL, perf.min = NULL, interval){
-  useDT <- copy(useDT)
-  meterDT <- copy(meterDT)
-
   if(is.character(useDT[, date])) useDT[, date:= as.POSIXct(date, format = date.format, tz = 'UTC')]
   if(is.character(meterDT[, inDate])) meterDT[, inDate:= as.POSIXct(inDate, format = date.format, tz = 'UTC')]
-  for(meter in unique(meterDT[, meterID])){
-    meterDT[meterID == meter,
-            inStart:= seq(from = inDate,
-                          length = 2,
-                          by = paste0("-", padding, " days"))[2]]
-    meterDT[meterID == meter,
-            inEnd:= seq(from = inDate,
-                        length = 2,
-                        by = paste0("+", padding, " days"))[2]]
-    meterDT[meterID == meter,
-            blStart:= seq(from = inStart,
-                          length = 2,
-                          by = paste0("-", base.length, " months"))[2]]
-    meterDT[meterID == meter,
-            pEnd:= seq(inEnd,
-                       length = 2,
-                       by = paste0("+", 12, " months"))[2]]
-  }
-  datVarV <- intersect(
-    names(meterDT),
-    c('inStart', 'inEnd', 'blStart', 'pEnd'))
-  useDT <- merge(
-    useDT,
-    meterDT[, c('meterID', datVarV), with = FALSE],
-    by = 'meterID')
-  useDT <- useDT[date >= blStart & date <= pEnd, ]
-  useDT[, period:=
-          as.numeric(date >= blStart) +
-          as.numeric(date >= inStart) +
-          as.numeric(date >= inEnd)]
-  useDT[, c('period', 'mm'):= list(
-    c('baseline', 'install', 'performance')[period],
-    month(date))]
+  if(is.null(base.min)) base.min <- 0
+  if(is.null(perf.min)) perf.min <- 0
+  meterV <- unique(meterDT$meterID); names(meterV) <- meterV
 
-  baseDropV <- NULL
-  perfDropV <- NULL
-  getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
-  if(!is.null(base.min)){
-    baseDropV <- useDT[period == 'baseline', getDays(date) > base.min, by = .(meterID)][V1 == FALSE, meterID]
-    baseDropV <- c(baseDropV, setdiff(unique(useDT[, meterID]), unique(useDT[period == 'baseline', meterID])))
-  }
-  if(!is.null(perf.min)){
-    perfDropV <- useDT[period == 'performance', getDays(date) > perf.min, by = .(meterID)][V1 == FALSE, meterID]
-    perfDropV <- c(perfDropV, setdiff(unique(useDT[, meterID]), unique(useDT[period == 'performance', meterID])))
-  }
-  useDT <- useDT[!(meterID %in% c(baseDropV, perfDropV)), ]
-  useDT[, tow:= .GRP, by = .(wday(date), hour(date))]
-  useDT[, (datVarV):= NULL]
-  meterV <- unique(useDT[, meterID]); names(meterV) <- meterV
-
-  classV <- c('hourly' = 'ebHourly')
-  out <- structure(list(dat = useDT,
-                        meterV = meterV,
-                        baseDropV = baseDropV,
-                        perfDropV = perfDropV),
-                   class = classV[interval])
+  ebData <- lapply(
+    meterV,
+    function(m) {
+      ebMeterFormat(meter = m,
+                    meterDT = meterDT,
+                    useDT = useDT,
+                    base.length = base.length,
+                    padding = padding,
+                    base.min = base.min,
+                    perf.min = perf.min,
+                    interval = interval)
+    })
 
   cat(length(meterV), 'total meters \n',
-      length(baseDropV),'insufficient baseline \n',
-      length(perfDropV),'insufficient performance \n')
-  return(out)
+      sum(sapply(ebData, function(x) x[['model']])), 'with sufficient data \n')
+  ebData
 }
 
-#' Model
+#' Meter Format
+#' @import data.table
 #' @export
-ebModel <- function(ebDat, type, option) UseMethod('ebModel')
+ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min = NULL,
+                          perf.min = NULL, interval){
+  dat <- useDT[meterID == meter, ]
+  inDate <- meterDT[meterID == meter, inDate]
+  dat[, period:=
+        (date >= inDate - as.difftime(padding, units = 'days') - as.difftime(30*base.length, units = 'days')) +
+        (date >= inDate - as.difftime(padding, units = 'days')) +
+        (date >= inDate + as.difftime(padding, units = 'days'))]
+  dat <- dat[period > 0, ]
+  pNames <- c('baseline', 'install', 'performance')
+  dat[, period:= as.factor(pNames[period])]
+  dat[, tow:= .GRP, by = .(wday(date), hour(date))]
+  dat[, mm:= month(date)]
 
-#' Hourly Model
+  getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
+  out <- list(dat = dat,
+              model = getDays(dat[period == 'baseline', date]) >= base.min &
+                getDays(dat[period == 'performance', date]) >= perf.min)
+
+  classV <- c('hourly' = 'hourly')
+  structure(out, class = classV[interval])
+}
+
+#' Baseline Model
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel.ebHourly <- function(ebDat, type = 'reg', option = NULL){
-  if(!(type %in% c('reg', 'GBoost'))) stop('Improper model type selected.')
-  dat <- copy(ebDat$dat)
-  if(type == 'reg'){
-    varV <- c('elct', paste0('tbin', 1:11), paste0('mm', 1:12))
-    dat <- ebRegFormat(dat)
-    modelList <- lapply(ebDat$meterV,
-                        function(meter) regModel(meter = meter, dat = dat, varV = varV))
-    structure(list(modelList = modelList, varV = varV), class = 'reg')
-  } else if(type == 'GBoost'){
+ebModel <- function(ebData, type = 'regress', option = NULL){
+  if(!(type %in% c('regress', 'gboost'))) stop('Error: Type not recognized.')
+  if(type == 'regress'){
+    modelList <- lapply(ebData, function(x){
+      if(!x$model) return(NA)
+      regress(x)
+    })
+  }
+  if(type == 'gboost'){
     pSet <- list(max_depth = 3,
                  nrounds = seq(200, 1400, 200),
                  early_stopping_rounds = 5,
@@ -105,26 +82,60 @@ ebModel.ebHourly <- function(ebDat, type = 'reg', option = NULL){
     parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
-        modelList <- lapply(ebDat$meterV, function(meter) gboost(meter, dat = dat, pSet = pSet))
+        modelList <- lapply(ebData, function(x){
+          if(!x$model) return(NA)
+          gboost(x, pSet = pSet)
+        })
       )
     })
     parallelMap::parallelStop()
-    structure(list(modelList = modelList), class = 'GBoost')
   }
+  modelList
 }
 
-#' GBoost Model Helper
+#' Regression Method
+#' @import data.table
+#' @export
+regress <- function(x) UseMethod('regress')
+
+#' Hourly Regression
+#' @import data.table
+#' @export
+regress.hourly <- function(x){
+  varV <- c('elct', paste0('tbin', 1:11), paste0('mm', 1:12))
+  dat <- x$dat[period == 'baseline', ]
+  dat <- regFormat(dat)
+  mod <- lm(elct ~ . - tow,
+            data = dat[, lapply(.SD,
+                                function(x) x - mean(x)),
+                       .SDcols = varV,
+                       by = .(tow)])
+  dat <- dat[, lapply(.SD, mean),
+             .SDcols = varV,
+             by = .(tow)]
+  out <- list(mod = mod, meanDT = dat, varV = varV)
+  structure(out, class = 'regress')
+}
+
+#' Gradient Boost
 #' @import data.table
 #' @import mlr
 #' @export
+gboost <- function(x, pSet) UseMethod('gboost')
 
-gboost <- function(meter, dat, pSet, option){
-  x <- dat[meterID == meter, ]
-  t <- length(x[period == 'baseline', date])
+
+#' Hourly Gradient Boost
+#' @import data.table
+#' @import mlr
+#' @export
+gboost.hourly <- function(x, pSet){
+  dat <- copy(x$dat)
+  t <- length(dat[period == 'baseline', date])
   blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
   regTask <- makeRegrTask(id = 'reg',
-                          data = as.data.frame(x[period == 'baseline',
-                                                 -c('meterID', 'date', 'period')]),
+                          data = as.data.frame(
+                            dat[period == 'baseline',
+                              -c('meterID', 'date', 'period')]),
                           target = 'elct',
                           blocking = blockFactor)
   paramSpace <- makeParamSet(
@@ -145,36 +156,57 @@ gboost <- function(meter, dat, pSet, option){
     makeLearner('regr.xgboost', verbose = 0, nthread = 8),
     par.vals = tuner$x)
   xgbModel <- train(learner = xgbLearn, task = regTask)
-  xgbModel
+  structure(list(mod = xgbModel), class = 'gboost')
 }
 
-
-
-
 #' Predictions
+#' @import data.table
+#' @import mlr
 #' @export
-ebPredict <- function(x, ebDT) UseMethod('ebPredict')
+ebPredict <- function(ebModels, ebData){
+  meterV <- names(ebModels); names(meterV) <- meterV
+  lapply(meterV,
+         function(x){
+           tryCatch(predict(ebModels[[x]], ebData[[x]]), error = function(e) data.table(meterID = x))
+         })
+}
 
-#' Reg Prediction
+#' Regression Predict
 #' @import data.table
 #' @export
-ebPredict.reg <- function(mList, ebDat){
-  dat <- copy(ebDat$dat)
-  dat <- ebRegFormat(dat)
-  predList <- lapply(ebDat$meterV,
-                     function(meter){
-                       ebRPred(meter = meter,
-                               dat = dat,
-                               varV = mList$varV,
-                               mList = mList)
-                     })
-  rbindlist(predList)
+predict.regress <- function(x, dat){
+  if(!dat$model) return(NA)
+  varV <- x$varV
+  dat <- regFormat(dat$dat)
+  predictDT <- merge(
+    dat,
+    x$meanDT,
+    by = 'tow',
+    suffixes = c('', '.mean'))
+  predictDT[, (varV):= lapply(varV, function(v) get(v) - get(paste0(v, '.mean')))]
+  predictDT[, pElct:= elct.mean + predict(x$mod, predictDT)]
+  merge(
+    dat[, .(meterID, date, period, elct)],
+    predictDT[, .(date, pElct)],
+    by = 'date')[, .(meterID, date, period, elct, pElct)]
+}
+
+#' GBoost Predict
+#' @import data.table
+#' @import mlr
+#' @export
+predict.gboost <- function(x, dat){
+  if(!dat$model) return(NA)
+  dat <- copy(dat$dat)
+  dat[, pElct:= predict(x$mod, newdata = as.data.frame(
+    dat[, -c('meterID', 'elct', 'date', 'period')]))$data$response]
+  dat[, .(meterID, date, period, elct, pElct)]
 }
 
 #' Reg Format Helper
 #' @import data.table
 #' @export
-ebRegFormat <- function(dat){
+regFormat <- function(dat){
   tBreaksV <- c(-Inf, 45 + 0:9*5, Inf)
   dat[, tbin:= cut(temp, breaks = tBreaksV, labels = 1:11)]
   dat[, paste0('tbin', 1:11):= lapply(1:11, function(t) as.numeric(tbin == t))]
@@ -182,62 +214,13 @@ ebRegFormat <- function(dat){
   dat
 }
 
-#' Reg Model Helper
-#' @import data.table
-#' @export
-regModel <- function(meter, dat, varV){
-  regDT <- dat[meterID == meter & period == 'baseline', ]
-  mod <- lm(elct ~ . - tow,
-            data = regDT[, lapply(.SD, function(x) x - mean(x)),
-                         .SDcols = varV,
-                         by = .(tow)])
-  regDT <- regDT[, lapply(.SD, mean),
-                 .SDcols = varV,
-                 by = .(tow)]
-  return(list(mod = mod, meanDT = regDT, varV = varV))
-}
 
-#' GBoost Predict
-#' @import data.table
-#' @import mlr
-#' @export
-ebPredict.GBoost <- function(mList, ebDat){
-  dat <- copy(ebDat$dat)
-  predList <- lapply(
-    ebDat$meterV,
-    function(meter){
-      x <- dat[meterID == meter, ]
-      x[meterID == meter,
-        pElct:= predict(mList$modelList[[meter]],
-                        newdata = as.data.frame(x[, -c('meterID', 'elct', 'date', 'period')]))$data$response]
-      x
-    }
-  )
-  rbindlist(predList)[, .(meterID, date, period, elct, pElct)]
-}
-
-#' Regression Predict Helper
-#' @import data.table
-#' @export
-ebRPred <- function(meter, dat, varV, mList){
-  predictDT <- merge(
-    dat[meterID == meter, ],
-    mList$modelList[[meter]][['meanDT']],
-    by = 'tow',
-    suffixes = c('', '.mean'))
-  predictDT[, (varV):= lapply(varV, function(v) get(v) - get(paste0(v, '.mean')))]
-
-  predictDT[, pElct:= elct.mean + predict(mList$modelList[[meter]][['mod']], predictDT)]
-  merge(dat[meterID == meter, .(meterID, date, period, elct)],
-        predictDT[, .(date, pElct)],
-        by = 'date')[, .(meterID, date, period, elct, pElct)]
-}
-
+# TODO: refactor prediction summary
 #' Prediction and Savings Summary
 #' @import data.table
 #' @export
-ebSummary <- function(predDT, meterDT){
-  predDT <- copy(predDT)
+ebSummary <- function(predictions, meterDT){
+  predDT <- rbindlist(predictions, fill = TRUE)
   meterDT <- copy(meterDT)
   R2 <- function(actual, predicted){
     actual <- na.omit(actual); predicted <- na.omit(predicted)
@@ -252,13 +235,14 @@ ebSummary <- function(predDT, meterDT){
     format(100*sum(predicted - actual)/sum(actual), digits = 1)
   }
   varCalc <- function(actual, predicted){
+    adjustedN(actual, length(actual))
     actual <- na.omit(actual); predicted <- na.omit(predicted)
     sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
       sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
   }
   adjustedN <- function(x, n){
     corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
-    (1 - corr)/(1 + corr)
+    n*(1 - corr)/(1 + corr)
   }
 
   sumMeterDT <- merge(
@@ -313,17 +297,38 @@ ebSummary <- function(predDT, meterDT){
     summaryProperty = sumPropertyDT))
 }
 
+#' Plot Meter Data
+#' @import data.table
+#' @import dygraphs
+#' @export
+ebPlot <- function(x, compress = TRUE){
+  dat <- copy(x)
+  setnames(dat, c('elct', 'pElct'), c('Actual', 'Predicted'))
+  datesV <- c(
+    min(dat[period == 'baseline', date]),
+    max(dat[period == 'baseline', date]),
+    min(dat[period == 'performance', date]),
+    max(dat[period == 'performance', date]))
+  if(compress) dat <- dat[, lapply(.SD, sum),
+                          .SDcols = c('Actual', 'Predicted'),
+                          by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
+  dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
+    dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = '#4889ce') %>%
+    dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = 'black') %>%
+    dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
+    dyEvent(datesV[2]) %>%
+    dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
+    dyLegend(width = 400)
+}
 
 #' Data Print Method
 #' @import data.table
 #' @export
-print.ebHourly <- function(x){
-  hpm <- x$dat[, .N, by = .(meterID)]$N
-  cat(length(x$meterV),'meters \n',
-      'Hours per meter: \n',
-      'Mean ', mean(hpm), 'Min', min(hpm), 'Max ', max(hpm))
+print.hourly <- function(x){
+  obs <- uniqueN(x$dat)
+  cat(obs,
+      'Observations \n',
+      'Type: Hourly \n',
+      'Modeled', x$model)
 }
-
-
-
 
