@@ -2,10 +2,10 @@
 % Please edit documentation in R/functions.R
 \name{ebModel}
 \alias{ebModel}
-\title{Model}
+\title{Baseline Model}
 \usage{
-ebModel(x, type)
+ebModel(ebData, type = "regress", option = NULL)
 }
 \description{
-Model
+Baseline Model
 }
