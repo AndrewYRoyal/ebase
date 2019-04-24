@@ -2,11 +2,10 @@
 #' @import data.table
 #' @export
 ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
-                         base.min = NULL, perf.min = NULL, interval){
+                         base.min = 0, perf.min = 0, interval = c('daily', 'hourly')){
   if(is.character(useDT[, date])) useDT[, date:= as.POSIXct(date, format = date.format, tz = 'UTC')]
   if(is.character(meterDT[, inDate])) meterDT[, inDate:= as.POSIXct(inDate, format = date.format, tz = 'UTC')]
-  if(is.null(base.min)) base.min <- 0
-  if(is.null(perf.min)) perf.min <- 0
+  interval <- match.arg(interval)
   meterV <- unique(meterDT$meterID); names(meterV) <- meterV
 
   ebData <- lapply(
@@ -30,8 +29,8 @@ ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
 #' Meter Format
 #' @import data.table
 #' @export
-ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min = NULL,
-                          perf.min = NULL, interval){
+ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min,
+                          perf.min, interval){
   dat <- useDT[meterID == meter, ]
   inDate <- meterDT[meterID == meter, inDate]
   dat[, period:=
@@ -49,8 +48,8 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
               model = getDays(dat[period == 'baseline', date]) >= base.min &
                 getDays(dat[period == 'performance', date]) >= perf.min)
 
-  classV <- c('hourly' = 'hourly')
-  structure(out, class = classV[interval])
+  classV <- list('hourly' = 'hourly', 'daily' = c('daily', 'hourly'))
+  structure(out, class = classV[[interval]])
 }
 
 #' Baseline Model
@@ -102,10 +101,10 @@ regress <- function(x) UseMethod('regress')
 #' @import data.table
 #' @export
 regress.hourly <- function(x){
-  varV <- c('elct', paste0('tbin', 1:11), paste0('mm', 1:12))
+  varV <- c('use', paste0('tbin', 1:11), paste0('mm', 1:12))
   dat <- x$dat[period == 'baseline', ]
   dat <- regFormat(dat)
-  mod <- lm(elct ~ . - tow,
+  mod <- lm(use ~ . - tow,
             data = dat[, lapply(.SD,
                                 function(x) x - mean(x)),
                        .SDcols = varV,
@@ -117,12 +116,12 @@ regress.hourly <- function(x){
   structure(out, class = 'regress')
 }
 
+
 #' Gradient Boost
 #' @import data.table
 #' @import mlr
 #' @export
 gboost <- function(x, pSet) UseMethod('gboost')
-
 
 #' Hourly Gradient Boost
 #' @import data.table
@@ -136,7 +135,7 @@ gboost.hourly <- function(x, pSet){
                           data = as.data.frame(
                             dat[period == 'baseline',
                               -c('meterID', 'date', 'period')]),
-                          target = 'elct',
+                          target = 'use',
                           blocking = blockFactor)
   paramSpace <- makeParamSet(
     makeDiscreteParam('max_depth', values = pSet$max_depth),
@@ -184,11 +183,11 @@ predict.regress <- function(x, dat){
     by = 'tow',
     suffixes = c('', '.mean'))
   predictDT[, (varV):= lapply(varV, function(v) get(v) - get(paste0(v, '.mean')))]
-  predictDT[, pElct:= elct.mean + predict(x$mod, predictDT)]
+  predictDT[, pUse:= use.mean + predict(x$mod, predictDT)]
   merge(
-    dat[, .(meterID, date, period, elct)],
-    predictDT[, .(date, pElct)],
-    by = 'date')[, .(meterID, date, period, elct, pElct)]
+    dat[, .(meterID, date, period, use)],
+    predictDT[, .(date, pUse)],
+    by = 'date')[, .(meterID, date, period, use, pUse)]
 }
 
 #' GBoost Predict
@@ -198,9 +197,9 @@ predict.regress <- function(x, dat){
 predict.gboost <- function(x, dat){
   if(!dat$model) return(NA)
   dat <- copy(dat$dat)
-  dat[, pElct:= predict(x$mod, newdata = as.data.frame(
-    dat[, -c('meterID', 'elct', 'date', 'period')]))$data$response]
-  dat[, .(meterID, date, period, elct, pElct)]
+  dat[, pUse:= predict(x$mod, newdata = as.data.frame(
+    dat[, -c('meterID', 'use', 'date', 'period')]))$data$response]
+  dat[, .(meterID, date, period, use, pUse)]
 }
 
 #' Reg Format Helper
@@ -244,16 +243,17 @@ ebSummary <- function(predictions, meterDT){
     corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
     n*(1 - corr)/(1 + corr)
   }
+  getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
 
   sumMeterDT <- merge(
     meterDT[, .(meterID)],
     predDT[period == 'baseline',
            list(
-             R2 = R2(elct, pElct),
-             CVRMSE = CVRMSE(elct, pElct),
-             NMBE = NMBE(elct, pElct),
-             baselineDays = round(.N/24, 0),
-             AnnualkWh = sum(elct)),
+             R2 = R2(use, pUse),
+             CVRMSE = CVRMSE(use, pUse),
+             NMBE = NMBE(use, pUse),
+             baselineDays = getDays(date),
+             Annual = sum(use)),
            by = .(meterID)],
     all.x = TRUE, by = 'meterID')
 
@@ -261,9 +261,9 @@ ebSummary <- function(predictions, meterDT){
     sumMeterDT,
     predDT[period == 'performance',
            list(
-             Savings = sum(pElct - elct),
-             varSavings = varCalc(elct, pElct),
-             performanceDays = round(.N/24, 0)),
+             Savings = sum(pUse - use),
+             varSavings = varCalc(use, pUse),
+             performanceDays = getDays(date)),
            by = .(meterID)],
     all.x = TRUE, by = 'meterID')
 
@@ -273,14 +273,14 @@ ebSummary <- function(predictions, meterDT){
       meterDT[, .(meterID, propertyName)],
       predDT,
       all.x = TRUE, by = 'meterID')[period == 'baseline', lapply(.SD, sum),
-                                    .SDcols = c('elct', 'pElct'),
+                                    .SDcols = c('use', 'pUse'),
                                     by = .(propertyName, date)]
 
     sumPropertyDT <- sumPropertyDT[, list(
-      R2 = R2(elct, pElct),
-      CVRMSE = CVRMSE(elct, pElct),
-      NMBE = NMBE(elct, pElct),
-      AnnualkWh = sum(elct)),
+      R2 = R2(use, pUse),
+      CVRMSE = CVRMSE(use, pUse),
+      NMBE = NMBE(use, pUse),
+      Annual = sum(use)),
       by = .(propertyName)]
 
     sumPropertyDT <- merge(
@@ -303,7 +303,7 @@ ebSummary <- function(predictions, meterDT){
 #' @export
 ebPlot <- function(x, compress = TRUE){
   dat <- copy(x)
-  setnames(dat, c('elct', 'pElct'), c('Actual', 'Predicted'))
+  setnames(dat, c('use', 'pUse'), c('Actual', 'Predicted'))
   datesV <- c(
     min(dat[period == 'baseline', date]),
     max(dat[period == 'baseline', date]),
