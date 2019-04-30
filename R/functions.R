@@ -132,11 +132,13 @@ gboost.hourly <- function(x, pSet){
   dat <- copy(x$dat)
   t <- length(dat[period == 'baseline', date])
   blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
+  if(is.null(dat$w)) dat$wt <- 1
   regTask <- makeRegrTask(id = 'reg',
                           data = as.data.frame(
                             dat[period == 'baseline',
-                              -c('meterID', 'date', 'period')]),
+                                intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]),
                           target = 'use',
+                          weights = dat[period == 'baseline', wt],
                           blocking = blockFactor)
   paramSpace <- makeParamSet(
     makeDiscreteParam('max_depth', values = pSet$max_depth),
@@ -199,7 +201,7 @@ predict.gboost <- function(x, dat){
   if(!dat$model) return(NA)
   dat <- copy(dat$dat)
   dat[, pUse:= predict(x$mod, newdata = as.data.frame(
-    dat[, -c('meterID', 'use', 'date', 'period')]))$data$response]
+    dat[, intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]))$data$response]
   dat[, .(meterID, date, period, use, pUse)]
 }
 
