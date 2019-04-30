@@ -34,10 +34,11 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   dat <- useDT[meterID == meter, ]
   inDate <- meterDT[meterID == meter, inDate]
   dat[, period:=
-        (date >= inDate - as.difftime(padding, units = 'days') - as.difftime(30*base.length, units = 'days')) +
+        (date >= inDate - as.difftime(padding + base.length, units = 'days')) +
         (date >= inDate - as.difftime(padding, units = 'days')) +
-        (date >= inDate + as.difftime(padding, units = 'days'))]
-  dat <- dat[period > 0, ]
+        (date >= inDate + as.difftime(padding, units = 'days')) +
+        (date >= inDate + as.difftime(padding + 365, units = 'days'))]
+  dat <- dat[period > 0 & period < 4, ]
   pNames <- c('baseline', 'install', 'performance')
   dat[, period:= as.factor(pNames[period])]
   dat[, tow:= .GRP, by = .(wday(date), hour(date))]
