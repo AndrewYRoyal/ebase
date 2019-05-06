@@ -1,8 +1,14 @@
 #' Data Format
 #' @import data.table
 #' @export
-ebDataFormat <- function(useDT, meterDT, base.length, date.format, padding,
-                         base.min = 0, perf.min = 0, interval = c('daily', 'hourly')){
+ebDataFormat <- function(useDT,
+                         meterDT,
+                         base.length,
+                         date.format,
+                         interval = c('daily', 'hourly'),
+                         padding = 0,
+                         base.min = 0,
+                         perf.min = 0){
   if(is.character(useDT[, date])) useDT[, date:= as.POSIXct(date, format = date.format, tz = 'UTC')]
   if(is.character(meterDT[, inDate])) meterDT[, inDate:= as.POSIXct(inDate, format = date.format, tz = 'UTC')]
   interval <- match.arg(interval)
@@ -45,7 +51,10 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   dat[, mm:= month(date)]
 
   getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
-  out <- list(dat = dat,
+  out <- list(dat = list(baseline = dat[period == 'baseline', ],
+                         install = dat[period == 'install', ],
+                         performance = dat[period == 'performance', ]),
+              property = unique(meterDT[meterID == meter, propertyName]),
               model = getDays(dat[period == 'baseline', date]) >= base.min &
                 getDays(dat[period == 'performance', date]) >= perf.min)
 
@@ -57,10 +66,10 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel <- function(ebData, type = 'regress', option = NULL){
+ebModel <- function(dataList, type = 'regress', option = NULL){
   if(!(type %in% c('regress', 'gboost'))) stop('Error: Type not recognized.')
   if(type == 'regress'){
-    modelList <- lapply(ebData, function(x){
+    modelList <- lapply(dataList, function(x){
       if(!x$model) return(NA)
       regress(x)
     })
@@ -82,7 +91,7 @@ ebModel <- function(ebData, type = 'regress', option = NULL){
     parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
-        modelList <- lapply(ebData, function(x){
+        modelList <- lapply(dataList, function(x){
           if(!x$model) return(NA)
           gboost(x, pSet = pSet)
         })
@@ -93,84 +102,23 @@ ebModel <- function(ebData, type = 'regress', option = NULL){
   modelList
 }
 
-#' Regression Method
-#' @import data.table
-#' @export
-regress <- function(x) UseMethod('regress')
-
-#' Hourly Regression
-#' @import data.table
-#' @export
-regress.hourly <- function(x){
-  varV <- c('use', paste0('tbin', 1:11), paste0('mm', 1:12))
-  dat <- x$dat[period == 'baseline', ]
-  dat <- regFormat(dat)
-  mod <- lm(use ~ . - tow,
-            data = dat[, lapply(.SD,
-                                function(x) x - mean(x)),
-                       .SDcols = varV,
-                       by = .(tow)])
-  dat <- dat[, lapply(.SD, mean),
-             .SDcols = varV,
-             by = .(tow)]
-  out <- list(mod = mod, meanDT = dat, varV = varV)
-  structure(out, class = 'regress')
-}
-
-
-#' Gradient Boost
-#' @import data.table
-#' @import mlr
-#' @export
-gboost <- function(x, pSet) UseMethod('gboost')
-
-#' Hourly Gradient Boost
-#' @import data.table
-#' @import mlr
-#' @export
-gboost.hourly <- function(x, pSet){
-  dat <- copy(x$dat)
-  t <- length(dat[period == 'baseline', date])
-  blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
-  if(is.null(dat$w)) dat$wt <- 1
-  regTask <- makeRegrTask(id = 'reg',
-                          data = as.data.frame(
-                            dat[period == 'baseline',
-                                intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]),
-                          target = 'use',
-                          weights = dat[period == 'baseline', wt],
-                          blocking = blockFactor)
-  paramSpace <- makeParamSet(
-    makeDiscreteParam('max_depth', values = pSet$max_depth),
-    makeDiscreteParam('nrounds', values = pSet$nrounds),
-    makeDiscreteParam('early_stopping_rounds', values = pSet$early_stopping_rounds),
-    makeDiscreteParam('eta', values = pSet$eta))
-  ctrl <- makeTuneControlGrid()
-  rSampleDesc <- makeResampleDesc('CV', iter = pSet$blocks)
-  tuner <- tuneParams(
-    learner = 'regr.xgboost',
-    task = regTask,
-    resampling = rSampleDesc,
-    par.set = paramSpace,
-    control = ctrl,
-    show.info = FALSE)
-  xgbLearn <- setHyperPars(
-    makeLearner('regr.xgboost', verbose = 0, nthread = 8),
-    par.vals = tuner$x)
-  xgbModel <- train(learner = xgbLearn, task = regTask)
-  structure(list(mod = xgbModel), class = 'gboost')
-}
-
 #' Predictions
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(ebModels, ebData){
-  meterV <- names(ebModels); names(meterV) <- meterV
-  lapply(meterV,
-         function(x){
-           tryCatch(predict(ebModels[[x]], ebData[[x]]), error = function(e) data.table(meterID = x))
-         })
+ebPredict <- function(modelList, dataList, period = c('performance', 'baseline')){
+  meterDict <- names(modelList); names(meterDict) <- meterDict
+  propertyDict <- setNames(sapply(dataList, function(x) x$property),
+                           names(dataList))
+  period <- match.arg(period)
+
+  dat <- lapply(meterDict,
+                function(x){
+                  tryCatch(predict(modelList[[x]], dataList[[x]]))#,
+                           #error = function(e) data.table(meterID = x))
+                  })
+  return(list(dat = dat,
+              propertyDict = propertyDict))
 }
 
 #' Regression Predict
@@ -179,7 +127,7 @@ ebPredict <- function(ebModels, ebData){
 predict.regress <- function(x, dat){
   if(!dat$model) return(NA)
   varV <- x$varV
-  dat <- regFormat(dat$dat)
+  dat <- regFormat(rbindlist(dat$dat))
   predictDT <- merge(
     dat,
     x$meanDT,
@@ -199,7 +147,7 @@ predict.regress <- function(x, dat){
 #' @export
 predict.gboost <- function(x, dat){
   if(!dat$model) return(NA)
-  dat <- copy(dat$dat)
+  dat <- copy(rbindlist(dat$dat))
   dat[, pUse:= predict(x$mod, newdata = as.data.frame(
     dat[, intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]))$data$response]
   dat[, .(meterID, date, period, use, pUse)]
@@ -216,90 +164,67 @@ regFormat <- function(dat){
   dat
 }
 
+#' Baseline Summary Helper
+#' @import data.table
+#' @export
+ebBaselineSummary <- function(dat){
+  dat[period == 'baseline', list(
+    meterID = unique(meterID),
+    R2 = R2(use, pUse),
+    CVRMSE = CVRMSE(use, pUse),
+    NMBE = NMBE(use, pUse),
+    baselineDays = uniqueN(as.POSIXct(round(date, 'days'))),
+    Annual = sum(use))]
+}
+#' Saving Summary Helper
+#' @import data.table
+#' @export
+ebSavingSummary <- function(dat){
+  dat[period == 'performance', list(
+    meterID = unique(meterID),
+    Savings = sum(pUse - use),
+    varSavings = varCalc(use, pUse),
+    performanceDays = uniqueN(as.POSIXct(round(date, 'days'))))]
+}
 
-# TODO: refactor prediction summary
 #' Prediction and Savings Summary
 #' @import data.table
 #' @export
-ebSummary <- function(predictions, meterDT){
-  predDT <- rbindlist(predictions, fill = TRUE)
-  meterDT <- copy(meterDT)
-  R2 <- function(actual, predicted){
-    actual <- na.omit(actual); predicted <- na.omit(predicted)
-    round(1 - sum((actual - predicted)^2)/sum((actual - mean(actual))^2), 2)
-  }
-  CVRMSE <- function(actual, predicted){
-    actual <- na.omit(actual); predicted <- na.omit(predicted)
-    round(100*sqrt(mean((actual - predicted)^2))/mean(actual), 0)
-  }
-  NMBE <- function(actual, predicted){
-    actual <- na.omit(actual); predicted <- na.omit(predicted)
-    format(100*sum(predicted - actual)/sum(actual), digits = 1)
-  }
-  varCalc <- function(actual, predicted){
-    adjustedN(actual, length(actual))
-    actual <- na.omit(actual); predicted <- na.omit(predicted)
-    sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
-      sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
-  }
-  adjustedN <- function(x, n){
-    corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
-    n*(1 - corr)/(1 + corr)
-  }
-  getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
+ebSummary <- function(predictions){
+  metricsList <- lapply(predictions$dat, function(x){
+    ebBaselineSummary(x)
+  })
+  savingList <- lapply(predictions$dat, function(x){
+    ebSavingSummary(x)
+  })
 
-  sumMeterDT <- merge(
-    meterDT[, .(meterID)],
-    predDT[period == 'baseline',
-           list(
-             R2 = R2(use, pUse),
-             CVRMSE = CVRMSE(use, pUse),
-             NMBE = NMBE(use, pUse),
-             baselineDays = getDays(date),
-             Annual = sum(use)),
-           by = .(meterID)],
-    all.x = TRUE, by = 'meterID')
-
-  sumMeterDT <- merge(
-    sumMeterDT,
-    predDT[period == 'performance',
-           list(
-             Savings = sum(pUse - use),
-             varSavings = varCalc(use, pUse),
-             performanceDays = getDays(date)),
-           by = .(meterID)],
-    all.x = TRUE, by = 'meterID')
-
-  sumPropertyDT <- NA
-  if('propertyName' %in% names(meterDT)){
-    sumPropertyDT <- merge(
-      meterDT[, .(meterID, propertyName)],
-      predDT,
-      all.x = TRUE, by = 'meterID')[period == 'baseline', lapply(.SD, sum),
-                                    .SDcols = c('use', 'pUse'),
-                                    by = .(propertyName, date)]
-
-    sumPropertyDT <- sumPropertyDT[, list(
-      R2 = R2(use, pUse),
-      CVRMSE = CVRMSE(use, pUse),
-      NMBE = NMBE(use, pUse),
-      Annual = sum(use)),
-      by = .(propertyName)]
-
-    sumPropertyDT <- merge(
-      sumPropertyDT,
-      merge(
-        sumMeterDT[, .(meterID, Savings, varSavings)],
-        meterDT[, .(propertyName, meterID)])[, lapply(.SD, sum, na.rm = TRUE),
-                                             .SDcols = c('Savings', 'varSavings'),
-                                             by = .(propertyName)],
-      all.x = TRUE, all.y = TRUE, by = 'propertyName')
-  }
-  return(list(
-    summaryMeter = sumMeterDT,
-    summaryProperty = sumPropertyDT))
+  propDT <- rbindlist(
+    lapply(predictions$dat, function(dat){
+      dat[, propertyName:= predictions$propertyDict[meterID]]
+      dat
+    })
+  )
+  propMetrics <- rbindlist(
+    lapply(unique(predictions$propertyDict), function(prop){
+      dat <- ebBaselineSummary(propDT[propertyName == prop, ])
+      dat[, meterID:= NULL]
+      dat[, propertyName:= prop]
+      unique(dat)
+    })
+  )
+  propSavings <- rbindlist(
+    lapply(unique(predictions$propertyDict), function(prop){
+      dat <- ebSavingSummary(propDT[propertyName == prop, ])
+      dat[, meterID:= NULL]
+      dat[, propertyName:= prop]
+      unique(dat)
+    })
+  )
+  return(list(Meters = list(metrics = rbindlist(metricsList),
+                            savings = rbindlist(savingList)),
+              Properties = list(metrics = propMetrics,
+                                savings = propSavings)))
 }
-
 #' Plot Meter Data
 #' @import data.table
 #' @import dygraphs
@@ -335,3 +260,35 @@ print.hourly <- function(x){
       'Modeled', x$model)
 }
 
+#' R2 calculation
+#' @export
+R2 <- function(actual, predicted){
+  actual <- na.omit(actual); predicted <- na.omit(predicted)
+  round(1 - sum((actual - predicted)^2)/sum((actual - mean(actual))^2), 2)
+}
+#' CVRMSE calculation
+#' @export
+CVRMSE <- function(actual, predicted){
+  actual <- na.omit(actual); predicted <- na.omit(predicted)
+  round(100*sqrt(mean((actual - predicted)^2))/mean(actual), 0)
+}
+#' NMBE calculation
+#' @export
+NMBE <- function(actual, predicted){
+  actual <- na.omit(actual); predicted <- na.omit(predicted)
+  format(100*sum(predicted - actual)/sum(actual), digits = 1)
+}
+#' Variance calculation
+#' @export
+varCalc <- function(actual, predicted){
+  adjustedN(actual, length(actual))
+  actual <- na.omit(actual); predicted <- na.omit(predicted)
+  sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
+    sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
+}
+#' Serial-Corr. Correction
+#' @export
+adjustedN <- function(x, n){
+  corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
+  n*(1 - corr)/(1 + corr)
+}
