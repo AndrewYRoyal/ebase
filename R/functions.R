@@ -4,6 +4,7 @@
 ebDataFormat <- function(useDT,
                          meterDT,
                          base.length,
+                         perf.length = 365,
                          date.format,
                          interval = c('daily', 'hourly'),
                          padding = 0,
@@ -21,6 +22,7 @@ ebDataFormat <- function(useDT,
                     meterDT = meterDT,
                     useDT = useDT,
                     base.length = base.length,
+                    perf.length = perf.length,
                     padding = padding,
                     base.min = base.min,
                     perf.min = perf.min,
@@ -36,14 +38,14 @@ ebDataFormat <- function(useDT,
 #' @import data.table
 #' @export
 ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min,
-                          perf.min, interval){
+                          perf.min, perf.length, interval){
   dat <- useDT[meterID == meter, ]
   inDate <- meterDT[meterID == meter, inDate]
   dat[, period:=
         (date >= inDate - as.difftime(padding + base.length, units = 'days')) +
         (date >= inDate - as.difftime(padding, units = 'days')) +
         (date >= inDate + as.difftime(padding, units = 'days')) +
-        (date >= inDate + as.difftime(padding + 365, units = 'days'))]
+        (date >= inDate + as.difftime(padding + perf.length, units = 'days'))]
   dat <- dat[period > 0 & period < 4, ]
   pNames <- c('baseline', 'install', 'performance')
   dat[, period:= as.factor(pNames[period])]
