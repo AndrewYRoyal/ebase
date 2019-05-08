@@ -16,7 +16,7 @@ gboost.hourly <- function(x, pSet){
   regTask <- makeRegrTask(id = 'reg',
                           data = as.data.frame(
                             dat[period == 'baseline',
-                                intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]),
+                                intersect(names(dat), c('use', 'temp', 'tow', 'mm', 'yday', 'oc')), with = FALSE]),
                           target = 'use',
                           #weights = dat[period == 'baseline', wt],
                           blocking = blockFactor)
