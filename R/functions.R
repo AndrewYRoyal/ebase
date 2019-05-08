@@ -151,7 +151,7 @@ predict.gboost <- function(x, dat){
   if(!dat$model) return(NA)
   dat <- copy(rbindlist(dat$dat))
   dat[, pUse:= predict(x$mod, newdata = as.data.frame(
-    dat[, intersect(names(dat), c('use', 'temp', 'tow', 'mm')), with = FALSE]))$data$response]
+    dat[, intersect(names(dat), c('use', 'temp', 'tow', 'yday', 'oc', 'mm')), with = FALSE]))$data$response]
   dat[, .(meterID, date, period, use, pUse)]
 }
 
