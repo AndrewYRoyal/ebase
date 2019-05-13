@@ -66,7 +66,6 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   classV <- list('hourly' = c('hourly', 'data.table'), 'daily' = c('daily', 'hourly', 'data.table'))
 
   out <- list(
-    baseline = structure(dat[period == 'baseline', ], class = classV[[interval]]),
     install = structure(dat[period == 'install', ], class = classV[[interval]]),
     performance = structure(dat[period == 'performance', ], class = classV[[interval]]),
     property = unique(meterDT[meterID == meter, propertyName]),
@@ -116,10 +115,10 @@ ebModel <- function(dataList, method = c('gboost', 'regress'), mOptions = NULL){
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(modelList, dataList){
+ebPredict <- function(modelList, dataList, periods = c('baseline', 'install', 'performance')){
   out <- lapply(dataList$meterDict, function(meter){
     rbindlist(
-      lapply(c('baseline', 'install', 'performance'),
+      lapply(periods),
              function(period) predict(mod = modelList[[meter]],
                                       dat = dataList[[period]][[meter]],
                                       ivars = dataList[['ivars']][[meter]]))
