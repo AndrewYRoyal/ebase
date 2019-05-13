@@ -5,7 +5,7 @@
 \title{Meter Format}
 \usage{
 ebMeterFormat(meter, useDT, meterDT, base.length, date.format, padding,
-  base.min = NULL, perf.min = NULL, interval)
+  base.min, perf.min, perf.length, interval)
 }
 \description{
 Meter Format

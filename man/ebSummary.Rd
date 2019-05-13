@@ -4,7 +4,7 @@
 \alias{ebSummary}
 \title{Prediction and Savings Summary}
 \usage{
-ebSummary(predictions, meterDT)
+ebSummary(predictions, propertyDict)
 }
 \description{
 Prediction and Savings Summary

@@ -4,8 +4,9 @@
 \alias{ebDataFormat}
 \title{Data Format}
 \usage{
-ebDataFormat(useDT, meterDT, base.length, date.format, padding,
-  base.min = NULL, perf.min = NULL, interval)
+ebDataFormat(useDT, meterDT, base.length = 365, perf.length = 365,
+  interval = c("daily", "hourly"), padding = 0, base.min = 0,
+  perf.min = 0)
 }
 \description{
 Data Format

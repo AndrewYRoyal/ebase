@@ -4,7 +4,7 @@
 \alias{ebModel}
 \title{Baseline Model}
 \usage{
-ebModel(ebData, type = "regress", option = NULL)
+ebModel(dataList, method = c("gboost", "regress"), mOptions = NULL)
 }
 \description{
 Baseline Model
