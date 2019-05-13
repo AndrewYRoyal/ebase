@@ -1,23 +1,32 @@
 #' Regression Method
 #' @import data.table
 #' @export
-regress <- function(x) UseMethod('regress')
+regress <- function(dat, ...) UseMethod('regress')
 
 #' Hourly Regression
 #' @import data.table
 #' @export
-regress.hourly <- function(x){
-  varV <- c('use', paste0('tbin', 1:11), paste0('mm', 1:12))
-  dat <- copy(x$dat[['baseline']])
-  dat <- regFormat(dat)
-  mod <- lm(use ~ . - tow,
-            data = dat[, lapply(.SD,
-                                function(x) x - mean(x)),
-                       .SDcols = varV,
-                       by = .(tow)])
-  dat <- dat[, lapply(.SD, mean),
-             .SDcols = varV,
-             by = .(tow)]
-  out <- list(mod = mod, meanDT = dat, varV = varV)
+regress.hourly <- function(dat, ...){
+  dat <- copy(as.data.table(dat))
+  mod <- lm(use ~ tbin + mm, data = dat[, .(use = use - mean(use),
+                                            tbin = tbin,
+                                            mm = mm),
+                                        by = .(tow)])
+  out <- list(mod = mod, towMeans = dat[, .(use = mean(use)), by = .(tow)])
   structure(out, class = 'regress')
 }
+
+#' Regression Predict
+#' @import data.table
+#' @export
+predict.regress <- function(mod, dat, ...){
+  dat <- copy(as.data.table(dat))
+  predDT <- merge(
+    dat,
+    mod$towMeans,
+    by = 'tow',
+    suffixes = c('', '.mean'))
+  predDT[, pUse:= use.mean + predict(mod$mod, predDT[, .(use = use - use.mean, tbin, mm)])]
+  predDT[, .(meterID, date, period, use, pUse)]
+}
+

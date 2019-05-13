@@ -2,23 +2,19 @@
 #' @import data.table
 #' @import mlr
 #' @export
-gboost <- function(x, pSet) UseMethod('gboost')
+gboost <- function(dat, ...) UseMethod('gboost')
 
 #' Hourly Gradient Boost
 #' @import data.table
 #' @import mlr
 #' @export
-gboost.hourly <- function(x, pSet){
-  dat <- copy(x$dat[['baseline']])
+gboost.hourly <- function(dat, ivars, pSet){
+  dat <- copy(dat)
   t <- length(dat$date)
   blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
-  #if(is.null(dat$w)) dat$wt <- 1
   regTask <- makeRegrTask(id = 'reg',
-                          data = as.data.frame(
-                            dat[period == 'baseline',
-                                intersect(names(dat), c('use', 'temp', 'tow', 'mm', 'yday', 'oc')), with = FALSE]),
+                          data = as.data.frame(dat[, c('use', ivars), with = FALSE]),
                           target = 'use',
-                          #weights = dat[period == 'baseline', wt],
                           blocking = blockFactor)
   paramSpace <- makeParamSet(
     makeDiscreteParam('max_depth', values = pSet$max_depth),
@@ -40,3 +36,15 @@ gboost.hourly <- function(x, pSet){
   xgbModel <- train(learner = xgbLearn, task = regTask)
   structure(list(mod = xgbModel), class = 'gboost')
 }
+
+
+#' GBoost Predict
+#' @import data.table
+#' @import mlr
+#' @export
+predict.gboost <- function(mod, dat, ivars){
+  predDT <- copy(dat)
+  predDT[, pUse:= predict(mod$mod, newdata = (as.data.frame(dat[, (ivars), with = FALSE])))$data$response]
+  predDT
+}
+
