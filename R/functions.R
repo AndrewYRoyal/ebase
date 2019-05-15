@@ -245,3 +245,69 @@ adjustedN <- function(x, n){
   corr <- acf(x, lag.max = 1, plot = FALSE)$acf[2]
   n*(1 - corr)/(1 + corr)
 }
+
+#' Modify formatted data
+#' @import data.table
+#' @export
+ebModifyData <- function(dataList,
+                         FUN,
+                         meterSubset = NULL,
+                         periods = c('baseline', 'install', 'performance')){
+  dataList <- copy(dataList)
+  if(is.null(meterSubset)) meterSubset <- dataList$meterDict
+  for(period in periods){
+    dataList[[period]][meterSubset] <- lapply(dataList[[period]][meterSubset],
+                                              function (dat) structure(FUN(dat), class = class(dat)))
+  }
+  dataList[['ivars']] <- lapply(dataList$meterDict, function(meter){
+    ivars = setdiff(names(dataList[['baseline']][[meter]]), c('meterID', 'date', 'use', 'period', 'tbin', 'mm'))
+  })
+  dataList
+}
+
+#' Calculate Loadpath Distance Matrix
+#' @import TSclust
+#' @import data.table
+#' @export
+ebDissCalc <- function(dat, method = 'DTWARP'){
+  dat <- dcast(dat, yday(date) ~ hour(date), value.var = 'use')
+  dat <- na.omit(dat)
+  dayV <- dat$date
+  dat <- as.matrix(dat[, -c('date')])
+  rownames(dat) <- dayV
+  diss(dat, method)
+}
+
+#' Cluster Data
+#' @export
+ebCluster <- function(dissM, k = 6){
+  clustDayDict <- cutree(hclust(dissM), k = k)
+  clustDict <- setNames(as.character(1:k), as.character(1:k))
+  distances <- vapply(clustDict, function(clust){
+    inClust <- names(clustDayDict[clustDayDict == clust])
+    outClust <- names(clustDayDict[clustDayDict != clust])
+    mean(as.matrix(dissM)[inClust, outClust])
+  }, FUN.VALUE = numeric(1))
+  count <- c(table(clustDayDict))
+  list(clustDayDict = clustDayDict,
+       distances = distances,
+       count = count,
+       stdev = sd(dissM))
+}
+
+#' Clustered Outlier Plot
+#' @import data.table
+#' @import dygraphs
+#' @export
+ebOutlierPlot <- function(dissM, dat, clustObj, countMax = 65, dstMin = 3){
+  dat <- copy(as.data.table(dat))[, .(date, use)]
+  dat[, cluster:= clustObj$clustDayDict[yday(date)]]
+  dat[, ccount:= clustObj$count[cluster]]
+  dat[, dst:= clustObj$distances[cluster] / clustObj$stdev]
+  dat[, outlier:= ccount < countMax & dst > dstMin]
+  dat[outlier == TRUE, `Clustered Outlier`:= use]
+  dat[outlier == FALSE, `Normal`:= use]
+  dygraph(dat[, .(date, `Clustered Outlier`, `Normal`)]) %>%
+    dyBarSeries('Clustered Outlier', color = 'red') %>%
+    dyBarSeries('Normal', color = 'gray')
+}
