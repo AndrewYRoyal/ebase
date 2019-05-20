@@ -211,7 +211,8 @@ ebPlot <- function(x, compress = TRUE){
     dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
     dyEvent(datesV[2]) %>%
     dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
-    dyLegend(width = 400)
+    dyLegend(width = 400) %>%
+    dyOptions(useDataTimezone  = TRUE)
 }
 
 #' R2 calculation
@@ -310,5 +311,6 @@ ebOutlierPlot <- function(dissM, dat, clustObj, countMax = 65, dstMin = 3){
   dat[outlier == FALSE, `Normal`:= use]
   dygraph(dat[, .(date, `Clustered Outlier`, `Normal`)]) %>%
     dyBarSeries('Clustered Outlier', color = 'red') %>%
-    dyBarSeries('Normal', color = 'gray')
+    dyBarSeries('Normal', color = 'gray') %>%
+    dyOptions(useDataTimezone  = TRUE)
 }
