@@ -292,7 +292,8 @@ ebCluster <- function(dissM, k = 6){
   list(clustDayDict = clustDayDict,
        distances = distances,
        count = count,
-       stdev = sd(dissM))
+       stdev = sd(dissM),
+       avg = mean(dissM))
 }
 
 #' Clustered Outlier Plot
@@ -303,7 +304,7 @@ ebOutlierPlot <- function(dissM, dat, clustObj, countMax = 65, dstMin = 3){
   dat <- copy(as.data.table(dat))[, .(date, use)]
   dat[, cluster:= clustObj$clustDayDict[yday(date)]]
   dat[, ccount:= clustObj$count[cluster]]
-  dat[, dst:= clustObj$distances[cluster] / clustObj$stdev]
+  dat[, dst:= (clustObj$distances[cluster] - clustObj$avg) / clustObj$stdev]
   dat[, outlier:= ccount < countMax & dst > dstMin]
   dat[outlier == TRUE, `Clustered Outlier`:= use]
   dat[outlier == FALSE, `Normal`:= use]
