@@ -94,7 +94,8 @@ ebModel <- function(dataList, method = c('gboost', 'regress'), mOptions = NULL){
                  early_stopping_rounds = 5,
                  eta = 0.1,
                  blocks = 2,
-                 cpus = 4)
+                 cpus = 4,
+                 weights = NULL)
     pSet <- c(pSet[setdiff(names(pSet), names(mOptions))], mOptions)
 
     parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
@@ -122,8 +123,8 @@ ebPredict <- function(modelList, dataList, periods = c('baseline', 'install', 'p
       lapply(periods,
              function(period) predict(mod = modelList[[meter]],
                                       dat = dataList[[period]][[meter]],
-                                      ivars = dataList[['ivars']][[meter]]))
-    )[, .(meterID, date, period, use, pUse)]
+                                      ivars = dataList[['ivars']][[meter]])),
+      fill = TRUE)[, .(meterID, date, period, use, pUse)]
   })
   out
 }
@@ -206,13 +207,29 @@ ebPlot <- function(x, compress = TRUE){
                           .SDcols = c('Actual', 'Predicted'),
                           by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
   dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
-    dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = '#4889ce') %>%
-    dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = 'black') %>%
+    dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = 'black') %>%
+    dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = '#4889ce') %>%
     dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
     dyEvent(datesV[2]) %>%
     dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
-    dyLegend(width = 400) %>%
-    dyOptions(useDataTimezone  = TRUE)
+    dyLegend(width = 400)
+
+  # datesV <- c(
+  #   min(dat[period == 'baseline', date]),
+  #   max(dat[period == 'baseline', date]),
+  #   min(dat[period == 'performance', date]),
+  #   max(dat[period == 'performance', date]))
+  # if(compress) dat <- dat[, lapply(.SD, sum),
+  #                         .SDcols = c('Actual', 'Predicted'),
+  #                         by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
+  # dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
+  #   dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = '#4889ce') %>%
+  #   dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = 'black') %>%
+  #   dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
+  #   dyEvent(datesV[2]) %>%
+  #   dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
+  #   dyLegend(width = 400) %>%
+  #   dyOptions(useDataTimezone  = TRUE)
 }
 
 #' R2 calculation

@@ -9,13 +9,15 @@ gboost <- function(dat, ...) UseMethod('gboost')
 #' @import mlr
 #' @export
 gboost.hourly <- function(dat, ivars, pSet){
-  dat <- copy(dat)
+  dat <- copy(as.data.table(dat))
   t <- length(dat$date)
   blockFactor <- factor(sort(rep(1:pSet$blocks, t)[1:t]))
+  weightsV <- tryCatch(dat[[pSet$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
-                          data = as.data.frame(dat[, c('use', ivars), with = FALSE]),
+                          data = as.data.frame(dat[, (.SD), .SDcols = c('use', ivars)]),
                           target = 'use',
-                          blocking = blockFactor)
+                          blocking = blockFactor,
+                          weights = weightsV)
   paramSpace <- makeParamSet(
     makeDiscreteParam('max_depth', values = pSet$max_depth),
     makeDiscreteParam('nrounds', values = pSet$nrounds),
