@@ -21,6 +21,17 @@ regress.hourly <- function(dat, ...){
 #' @export
 predict.regress <- function(mod, dat, ...){
   dat <- copy(as.data.table(dat))
+
+  mmLevels <- setNames(mod$mod$xlevels$mm, mod$mod$xlevels$mm)
+  msngLevels <- setdiff(levels(dat$mm), mmLevels); names(msngLevels) <- msngLevels
+
+  if(length(msngLevels) > 0){
+    lnnDict <- sapply(msngLevels, function(x){
+      as.character(mmLevels[which.min(abs(as.numeric(mmLevels) - as.numeric(x)))])
+    })
+    dat[mm %in% msngLevels, mm:= lnnDict[as.character(mm)]]
+  }
+
   predDT <- merge(
     dat,
     mod$towMeans,

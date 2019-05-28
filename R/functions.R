@@ -31,6 +31,7 @@ ebDataFormat <- function(useDT,
   cat(length(meterDict), 'with sufficient data \n')
 
   out <- list(
+    pretrial = lapply(meterDict, function(meter) dataList[[meter]][['pretrial']]),
     baseline = lapply(meterDict, function(meter) dataList[[meter]][['baseline']]),
     install = lapply(meterDict, function(meter) dataList[[meter]][['install']]),
     performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
@@ -49,12 +50,13 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   dat <- useDT[meterID == meter, ]
   inDate <- meterDT[meterID == meter, inDate]
   dat[, period:=
+        (date >= inDate - as.difftime(padding + base.length + 30, units = 'days')) +
         (date >= inDate - as.difftime(padding + base.length, units = 'days')) +
         (date >= inDate - as.difftime(padding, units = 'days')) +
         (date >= inDate + as.difftime(padding, units = 'days')) +
         (date >= inDate + as.difftime(padding + perf.length, units = 'days'))]
-  dat <- dat[period > 0 & period < 4, ]
-  pNames <- c('baseline', 'install', 'performance')
+  dat <- dat[period > 0 & period < 5, ]
+  pNames <- c('pretrial', 'baseline', 'install', 'performance')
   dat[, period:= as.factor(pNames[period])]
   dat[, tow:= .GRP, by = .(wday(date), hour(date))]
   dat[, month:= month(date)]
@@ -66,6 +68,7 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   classV <- list('hourly' = c('hourly', 'data.table'), 'daily' = c('daily', 'hourly', 'data.table'))
 
   out <- list(
+    pretrial = structure(dat[period == 'pretrial', ], class = classV[[interval]]),
     baseline = structure(dat[period == 'baseline', ], class = classV[[interval]]),
     install = structure(dat[period == 'install', ], class = classV[[interval]]),
     performance = structure(dat[period == 'performance', ], class = classV[[interval]]),
@@ -117,7 +120,7 @@ ebModel <- function(dataList, method = c('gboost', 'regress'), mOptions = NULL){
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(modelList, dataList, periods = c('baseline', 'install', 'performance')){
+ebPredict <- function(modelList, dataList, periods = c('pretrial', 'baseline', 'install', 'performance')){
   out <- lapply(dataList$meterDict, function(meter){
     rbindlist(
       lapply(periods,
@@ -212,24 +215,8 @@ ebPlot <- function(x, compress = TRUE){
     dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
     dyEvent(datesV[2]) %>%
     dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
+    dyEvent(datesV[1], 'Pre-Trial', labelLoc = "top") %>%
     dyLegend(width = 400)
-
-  # datesV <- c(
-  #   min(dat[period == 'baseline', date]),
-  #   max(dat[period == 'baseline', date]),
-  #   min(dat[period == 'performance', date]),
-  #   max(dat[period == 'performance', date]))
-  # if(compress) dat <- dat[, lapply(.SD, sum),
-  #                         .SDcols = c('Actual', 'Predicted'),
-  #                         by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
-  # dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
-  #   dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = '#4889ce') %>%
-  #   dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = 'black') %>%
-  #   dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
-  #   dyEvent(datesV[2]) %>%
-  #   dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
-  #   dyLegend(width = 400) %>%
-  #   dyOptions(useDataTimezone  = TRUE)
 }
 
 #' R2 calculation
