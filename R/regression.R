@@ -6,12 +6,16 @@ regress <- function(dat, ...) UseMethod('regress')
 #' Hourly Regression
 #' @import data.table
 #' @export
-regress.hourly <- function(dat, ...){
+regress.hourly <- function(dat, pSet, ...){
   dat <- copy(as.data.table(dat))
-  mod <- lm(use ~ tbin + mm, data = dat[, .(use = use - mean(use),
-                                            tbin = tbin,
-                                            mm = mm),
-                                        by = .(tow)])
+  if(is.null(pSet$weights)) dat[, obs_weights:= 1] else setnames(dat, pSet$weights, 'obs_weights')
+  mod <- lm(use ~ tbin + mm,
+            data = dat[, .(use = use - weighted.mean(use, obs_weights),
+                           tbin = tbin,
+                           mm = mm,
+                           obs_weights = obs_weights),
+                       by = .(tow)],
+            weights = obs_weights)
   out <- list(mod = mod, towMeans = dat[, .(use = mean(use)), by = .(tow)])
   structure(out, class = 'regress')
 }

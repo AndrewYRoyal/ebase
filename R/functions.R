@@ -84,22 +84,23 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel <- function(dataList, method = c('gboost', 'regress'), mOptions = NULL){
+ebModel <- function(dataList, method = c('regress', 'gboost'), mOptions = NULL){
   method <- match.arg(method)
+  pSet <- list(max_depth = 3,
+               nrounds = seq(200, 1400, 200),
+               early_stopping_rounds = 5,
+               eta = 0.1,
+               blocks = 2,
+               cpus = 4,
+               weights = NULL)
+  pSet <- c(pSet[setdiff(names(pSet), names(mOptions))], mOptions)
   if(method == 'regress'){
     modelList <- lapply(dataList$meterDict, function(meter){
-      regress(dat = dataList[['baseline']][[meter]], tcuts = dataList[['tcuts']][[meter]])
+      regress(dat = dataList[['baseline']][[meter]],
+              pSet = pSet)
     })
   }
   if(method == 'gboost'){
-    pSet <- list(max_depth = 3,
-                 nrounds = seq(200, 1400, 200),
-                 early_stopping_rounds = 5,
-                 eta = 0.1,
-                 blocks = 2,
-                 cpus = 4,
-                 weights = NULL)
-    pSet <- c(pSet[setdiff(names(pSet), names(mOptions))], mOptions)
 
     parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
