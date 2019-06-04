@@ -36,7 +36,7 @@ ebDataFormat <- function(useDT,
     install = lapply(meterDict, function(meter) dataList[[meter]][['install']]),
     performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
     meterDict = meterDict,
-    propertyDict = sapply(meterDict, function(meter) dataList[[meter]][['property']]),
+    siteDict = sapply(meterDict, function(meter) dataList[[meter]][['site']]),
     ivars = lapply(meterDict, function(meter) dataList[[meter]][['ivars']]),
     tcuts = lapply(meterDict, function(meter) dataList[[meter]][['tcuts']]))
   out
@@ -72,7 +72,7 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
     baseline = structure(dat[period == 'baseline', ], class = classV[[interval]]),
     install = structure(dat[period == 'install', ], class = classV[[interval]]),
     performance = structure(dat[period == 'performance', ], class = classV[[interval]]),
-    property = unique(meterDT[meterID == meter, propertyName]),
+    site = unique(meterDT[meterID == meter, site]),
     model = getDays(dat[period == 'baseline', date]) >= base.min &
       getDays(dat[period == 'performance', date]) >= perf.min,
     ivars = setdiff(names(dat), c('meterID', 'date', 'use', 'period', 'tbin', 'mm')),
@@ -159,7 +159,7 @@ ebSavingSummary <- function(dat){
 #' Prediction and Savings Summary
 #' @import data.table
 #' @export
-ebSummary <- function(predictions, propertyDict){
+ebSummary <- function(predictions, siteDict){
   metricsList <- lapply(predictions, function(x){
     ebBaselineSummary(x)
   })
@@ -167,33 +167,33 @@ ebSummary <- function(predictions, propertyDict){
     ebSavingSummary(x)
   })
 
-  propDT <- rbindlist(
+  siteDT <- rbindlist(
     lapply(predictions, function(dat){
       dat <- copy(dat)
-      dat[, propertyName:= propertyDict[meterID]]
+      dat[, site:= siteDict[meterID]]
       dat
     })
   )
-  propMetrics <- rbindlist(
-    lapply(unique(propertyDict), function(prop){
-      dat <- ebBaselineSummary(propDT[propertyName == prop, ])
+  siteMetrics <- rbindlist(
+    lapply(unique(siteDict), function(s){
+      dat <- ebBaselineSummary(siteDT[site == s, ])
       dat[, meterID:= NULL]
-      dat[, propertyName:= prop]
+      dat[, site:= s]
       unique(dat)
     })
   )
-  propSavings <- rbindlist(
-    lapply(unique(propertyDict), function(prop){
-      dat <- ebSavingSummary(propDT[propertyName == prop, ])
+  siteSavings <- rbindlist(
+    lapply(unique(siteDict), function(s){
+      dat <- ebSavingSummary(siteDT[site == s, ])
       dat[, meterID:= NULL]
-      dat[, propertyName:= prop]
+      dat[, site:= s]
       unique(dat)
     })
   )
   return(list(Meters = list(metrics = rbindlist(metricsList),
                             savings = rbindlist(savingList)),
-              Properties = list(metrics = propMetrics,
-                                savings = propSavings)))
+              Sites = list(metrics = siteMetrics,
+                           savings = siteSavings)))
 }
 #' Plot Meter Data
 #' @import data.table
