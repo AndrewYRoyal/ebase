@@ -1,14 +1,14 @@
-#' Gradient Boost
+#' Random Forest
 #' @import data.table
 #' @import mlr
 #' @export
-gboost <- function(dat, ...) UseMethod('gboost')
+rforest <- function(dat, ...) UseMethod('rforest')
 
-#' Hourly Gradient Boost
+#' Hourly random forest
 #' @import data.table
 #' @import mlr
 #' @export
-gboost.hourly <- function(dat, ivars, pSet){
+rforest.hourly <- function(dat, ivars, pSet){
   dat <- copy(as.data.table(dat))
   blockFactor <- factor(sort(rep(1:pSet$blocks, length(dat$date))[1:length(dat$date)]))
   weightsV <- tryCatch(dat[[pSet$weights]], error = function(e) NULL)
@@ -18,34 +18,19 @@ gboost.hourly <- function(dat, ivars, pSet){
                           blocking = blockFactor,
                           weights = weightsV)
   paramSpace <- makeParamSet(
-    makeDiscreteParam('max_depth', values = pSet$max_depth),
-    makeDiscreteParam('nrounds', values = pSet$nrounds),
-    makeDiscreteParam('early_stopping_rounds', values = pSet$early_stopping_rounds),
-    makeDiscreteParam('eta', values = pSet$eta))
+    makeDiscreteParam('ntree', values = pSet$ntree))
   ctrl <- makeTuneControlGrid()
   rSampleDesc <- makeResampleDesc('CV', iter = pSet$blocks)
   tuner <- tuneParams(
-    learner = 'regr.xgboost',
+    learner = 'regr.randomForest',
     task = regTask,
     resampling = rSampleDesc,
     par.set = paramSpace,
     control = ctrl,
     show.info = FALSE)
   xgbLearn <- setHyperPars(
-    makeLearner('regr.xgboost', verbose = 0, nthread = 8),
+    makeLearner('regr.randomForest'),
     par.vals = tuner$x)
   xgbModel <- train(learner = xgbLearn, task = regTask)
-  structure(list(mod = xgbModel), class = 'gboost')
+  structure(list(mod = xgbModel), class = c('rforest', 'gboost'))
 }
-
-
-#' GBoost Predict
-#' @import data.table
-#' @import mlr
-#' @export
-predict.gboost <- function(mod, dat, ivars){
-  predDT <- copy(dat)
-  predDT[, pUse:= predict(mod$mod, newdata = (as.data.frame(dat[, (ivars), with = FALSE])))$data$response]
-  predDT
-}
-

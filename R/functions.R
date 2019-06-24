@@ -84,10 +84,11 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel <- function(dataList, method = c('regress', 'gboost'), mOptions = NULL){
+ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), mOptions = NULL){
   method <- match.arg(method)
   pSet <- list(max_depth = 3,
                nrounds = seq(200, 1400, 200),
+               ntree = 1:5 * 50,
                early_stopping_rounds = 5,
                eta = 0.1,
                blocks = 2,
@@ -100,15 +101,16 @@ ebModel <- function(dataList, method = c('regress', 'gboost'), mOptions = NULL){
               pSet = pSet)
     })
   }
-  if(method == 'gboost'){
-
+  if(method != 'regress'){
+    modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
+                         ivars = dataList[['ivars']][[meter]],
+                         pSet = pSet))
+    modelCall[[1]] <- as.name(method)
     parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
         modelList <- lapply(dataList$meterDict, function(meter){
-          gboost(dat = dataList[['baseline']][[meter]],
-                 ivars = dataList[['ivars']][[meter]],
-                 pSet = pSet)
+          eval(modelCall)
         })
       )
     })
