@@ -244,8 +244,8 @@ NMBE <- function(actual, predicted){
 #' @export
 varCalc <- function(actual, predicted){
   actual <- na.omit(actual); predicted <- na.omit(predicted)
-  sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
-    sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted))
+  length(actual) * (sum((actual - mean(actual))^2)/adjustedN(actual, length(actual)) +
+                      sum((predicted - mean(predicted))^2)/adjustedN(predicted, length(predicted)))
 }
 #' Serial-Corr. Correction
 #' @export
