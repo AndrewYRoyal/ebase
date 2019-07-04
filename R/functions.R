@@ -8,10 +8,13 @@ ebDataFormat <- function(useDT,
                          interval = c('daily', 'hourly'),
                          padding = 0,
                          base.min = 0,
-                         perf.min = 0){
+                         perf.min = 0,
+                         temp_bins = NULL){
   interval <- match.arg(interval)
   meterDict <- setNames(unique(meterDT$meterID), unique(meterDT$meterID))
   cat(length(meterDict), 'total meters \n')
+  no_tbin <- setdiff(meterDict, names(temp_bins))
+  temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
   dataList <- lapply(
     meterDict,
@@ -24,7 +27,8 @@ ebDataFormat <- function(useDT,
                     padding = padding,
                     base.min = base.min,
                     perf.min = perf.min,
-                    interval = interval)
+                    interval = interval,
+                    ntbin = temp_bins[m])
   })
 
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
@@ -46,7 +50,7 @@ ebDataFormat <- function(useDT,
 #' @import data.table
 #' @export
 ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min,
-                          perf.min, perf.length, interval){
+                          perf.min, perf.length, interval, ntbin){
   dat <- useDT[meterID == meter, ]
   inDate <- meterDT[meterID == meter, inDate]
   dat[, period:=
@@ -61,7 +65,7 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   dat[, tow:= .GRP, by = .(wday(date), hour(date))]
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
-  tcuts <- c(-Inf, quantile(dat$temp, 1:10/10))
+  tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
   dat[, tbin:= as.factor(cut(temp, tcuts))]
 
   getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
