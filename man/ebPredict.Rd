@@ -4,8 +4,8 @@
 \alias{ebPredict}
 \title{Predictions}
 \usage{
-ebPredict(modelList, dataList, periods = c("baseline", "install",
-  "performance"))
+ebPredict(modelList, dataList, periods = c("pretrial", "baseline",
+  "install", "performance"))
 }
 \description{
 Predictions

@@ -4,8 +4,7 @@
 \alias{ebMeterFormat}
 \title{Meter Format}
 \usage{
-ebMeterFormat(meter, useDT, meterDT, base.length, date.format, padding,
-  base.min, perf.min, perf.length, interval)
+ebMeterFormat(dat, inDate, ntbin, data_options)
 }
 \description{
 Meter Format
