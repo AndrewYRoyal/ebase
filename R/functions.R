@@ -1,36 +1,35 @@
 #' Data Format
 #' @import data.table
 #' @export
-ebDataFormat <- function(useDT,
-                         meterDT,
-                         base.length = 365,
-                         perf.length = 365,
-                         interval = c('daily', 'hourly'),
-                         padding = 0,
-                         base.min = 0,
-                         perf.min = 0,
+ebDataFormat <- function(x,
+                         install_dates,
+                         sites = NULL,
+                         data_options = NULL,
                          temp_bins = NULL){
-  interval <- match.arg(interval)
-  meterDict <- setNames(unique(meterDT$meterID), unique(meterDT$meterID))
+  defaults <- list(interval = 'hourly',
+                   base_length = 365,
+                   perf_length = 365,
+                   blackout = 0,
+                   base_min = 0,
+                   perf_min = 0)
+  data_options <- c(defaults[setdiff(names(defaults), names(data_options))], data_options)
+  if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
+  meterDict <- setNames(unique(x$meterID), unique(x$meterID))
   cat(length(meterDict), 'total meters \n')
+  sites <- c(meterDict[setdiff(meterDict, names(sites))], sites)
+  if(length(setdiff(meterDict, names(install_dates))) > 0) stop(
+    sprintf('No install date for %s \n', paste(setdiff(meterDict, names(install_dates)), sep = ', ')))
   no_tbin <- setdiff(meterDict, names(temp_bins))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
   dataList <- lapply(
     meterDict,
     function(m){
-      ebMeterFormat(meter = m,
-                    meterDT = meterDT,
-                    useDT = useDT,
-                    base.length = base.length,
-                    perf.length = perf.length,
-                    padding = padding,
-                    base.min = base.min,
-                    perf.min = perf.min,
-                    interval = interval,
-                    ntbin = temp_bins[m])
+      ebMeterFormat(dat = x[meterID == m, ],
+                    inDate = install_dates[[m]],
+                    ntbin = temp_bins[m],
+                    data_options = data_options)
   })
-
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
   cat(length(meterDict), 'with sufficient data \n')
 
@@ -40,7 +39,7 @@ ebDataFormat <- function(useDT,
     install = lapply(meterDict, function(meter) dataList[[meter]][['install']]),
     performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
     meterDict = meterDict,
-    siteDict = sapply(meterDict, function(meter) dataList[[meter]][['site']]),
+    siteDict = sites,
     ivars = lapply(meterDict, function(meter) dataList[[meter]][['ivars']]),
     tcuts = lapply(meterDict, function(meter) dataList[[meter]][['tcuts']]))
   out
@@ -49,16 +48,13 @@ ebDataFormat <- function(useDT,
 #' Meter Format
 #' @import data.table
 #' @export
-ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, padding, base.min,
-                          perf.min, perf.length, interval, ntbin){
-  dat <- useDT[meterID == meter, ]
-  inDate <- meterDT[meterID == meter, inDate]
+ebMeterFormat <- function(dat, inDate, ntbin, data_options){
   dat[, period:=
-        (date >= inDate - as.difftime(padding + base.length + 30, units = 'days')) +
-        (date >= inDate - as.difftime(padding + base.length, units = 'days')) +
-        (date >= inDate - as.difftime(padding, units = 'days')) +
-        (date >= inDate + as.difftime(padding, units = 'days')) +
-        (date >= inDate + as.difftime(padding + perf.length, units = 'days'))]
+        (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length + 30, units = 'days')) +
+        (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length, units = 'days')) +
+        (date >= min(inDate) - as.difftime(data_options$blackout / 2, units = 'days')) +
+        (date >= max(inDate) + as.difftime(data_options$blackout / 2, units = 'days')) +
+        (date >= max(inDate) + as.difftime(data_options$blackout / 2 + data_options$perf_length, units = 'days'))]
   dat <- dat[period > 0 & period < 5, ]
   pNames <- c('pretrial', 'baseline', 'install', 'performance')
   dat[, period:= as.factor(pNames[period])]
@@ -69,16 +65,16 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
   dat[, tbin:= as.factor(cut(temp, tcuts))]
 
   getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
-  classV <- list('hourly' = c('hourly', 'data.table'), 'daily' = c('daily', 'hourly', 'data.table'))
+  classStr <- list('hourly' = c('hourly'), 'daily' = c('daily', 'hourly'))[[data_options$interval]]
+  setattr(dat, "class", c(classStr, class(dat)))
 
   out <- list(
-    pretrial = structure(dat[period == 'pretrial', ], class = classV[[interval]]),
-    baseline = structure(dat[period == 'baseline', ], class = classV[[interval]]),
-    install = structure(dat[period == 'install', ], class = classV[[interval]]),
-    performance = structure(dat[period == 'performance', ], class = classV[[interval]]),
-    site = unique(meterDT[meterID == meter, site]),
-    model = getDays(dat[period == 'baseline', date]) >= base.min &
-      getDays(dat[period == 'performance', date]) >= perf.min,
+    pretrial = dat[period == 'pretrial', ],
+    baseline = dat[period == 'baseline', ],
+    install = dat[period == 'install', ],
+    performance = dat[period == 'performance', ],
+    model = getDays(dat[period == 'baseline', date]) >= data_options$base_min &
+      getDays(dat[period == 'performance', date]) >= data_options$perf_min,
     ivars = setdiff(names(dat), c('meterID', 'date', 'use', 'period', 'tbin', 'mm')),
     tcuts = tcuts
   )
@@ -88,7 +84,7 @@ ebMeterFormat <- function(meter, useDT, meterDT, base.length, date.format, paddi
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), mOptions = NULL){
+ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), model_options = NULL){
   method <- match.arg(method)
   pSet <- list(max_depth = 3,
                nrounds = seq(200, 1400, 200),
@@ -98,7 +94,7 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), mOptio
                blocks = 2,
                cpus = 4,
                weights = NULL)
-  pSet <- c(pSet[setdiff(names(pSet), names(mOptions))], mOptions)
+  pSet <- c(pSet[setdiff(names(pSet), names(model_options))], model_options)
   if(method == 'regress'){
     modelList <- lapply(dataList$meterDict, function(meter){
       regress(dat = dataList[['baseline']][[meter]],
@@ -291,38 +287,22 @@ ebDissCalc <- function(dat, method = 'DTWARP'){
   diss(dat, method)
 }
 
-#' Cluster Data
+#' Apply Outlier Weights
+#' @import data.table
 #' @export
-ebCluster <- function(dissM, k = 6){
-  clustDayDict <- cutree(hclust(dissM), k = k)
-  clustDict <- setNames(as.character(1:k), as.character(1:k))
-  distances <- vapply(clustDict, function(clust){
-    inClust <- names(clustDayDict[clustDayDict == clust])
-    outClust <- names(clustDayDict[clustDayDict != clust])
-    mean(as.matrix(dissM)[inClust, outClust])
-  }, FUN.VALUE = numeric(1))
-  count <- c(table(clustDayDict))
-  list(clustDayDict = clustDayDict,
-       distances = distances,
-       count = count,
-       stdev = sd(dissM),
-       avg = mean(dissM))
+
+ebOutlierWeights <- function(dat){
+  dat <- copy(dat)
+  weightFn <- function(z0, z1, p0, p1){
+    b <- (log(1 / p1 - 1) - log(1 / p0 - 1)) / (z1 - z0)
+    a <- log(1 / p0 - 1) - b * z0
+    function(z) 1 / (1 + exp(b * z + a))
+  }
+  wt <- weightFn(1, 3, .75, .001)
+  dat[, z:= abs((use - mean(use)) / sd(use)), by = .(tow)]
+  dat[, weight:= wt(z)]
+  dat[, z:= NULL]
 }
 
-#' Clustered Outlier Plot
-#' @import data.table
-#' @import dygraphs
-#' @export
-ebOutlierPlot <- function(dissM, dat, clustObj, countMax = 65, dstMin = 3){
-  dat <- copy(as.data.table(dat))[, .(date, use)]
-  dat[, cluster:= clustObj$clustDayDict[yday(date)]]
-  dat[, ccount:= clustObj$count[cluster]]
-  dat[, dst:= (clustObj$distances[cluster] - clustObj$avg) / clustObj$stdev]
-  dat[, outlier:= ccount < countMax & dst > dstMin]
-  dat[outlier == TRUE, `Clustered Outlier`:= use]
-  dat[outlier == FALSE, `Normal`:= use]
-  dygraph(dat[, .(date, `Clustered Outlier`, `Normal`)]) %>%
-    dyBarSeries('Clustered Outlier', color = 'red') %>%
-    dyBarSeries('Normal', color = 'gray') %>%
-    dyOptions(useDataTimezone  = TRUE)
-}
+
+# curve(wt, from = 0, to = 3)
