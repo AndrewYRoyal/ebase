@@ -16,7 +16,6 @@ ebDataFormat <- function(x,
   if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
   meterDict <- setNames(unique(x$meterID), unique(x$meterID))
   cat(length(meterDict), 'total meters \n')
-  sites <- c(meterDict[setdiff(meterDict, names(sites))], sites)
   if(length(setdiff(meterDict, names(install_dates))) > 0) stop(
     sprintf('No install date for %s \n', paste(setdiff(meterDict, names(install_dates)), sep = ', ')))
   no_tbin <- setdiff(meterDict, names(temp_bins))
@@ -32,6 +31,7 @@ ebDataFormat <- function(x,
   })
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
   cat(length(meterDict), 'with sufficient data \n')
+  sites <- c(meterDict[setdiff(meterDict, names(sites))], sites)
 
   out <- list(
     pretrial = lapply(meterDict, function(meter) dataList[[meter]][['pretrial']]),
