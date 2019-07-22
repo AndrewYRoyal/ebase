@@ -31,7 +31,7 @@ ebDataFormat <- function(x,
   })
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
   cat(length(meterDict), 'with sufficient data \n')
-  sites <- c(meterDict[setdiff(meterDict, names(sites))], sites)
+  sites <- sites[names(sites) %in% meterDict]
 
   out <- list(
     pretrial = lapply(meterDict, function(meter) dataList[[meter]][['pretrial']]),
