@@ -9,10 +9,10 @@ regress <- function(dat, ...) UseMethod('regress')
 regress.hourly <- function(dat, pSet, ...){
   dat <- copy(dat)
   if(is.null(pSet$weights)) dat[, obs_weights:= 1] else setnames(dat, pSet$weights, 'obs_weights')
-  reg_formula <- quote(use ~ tbin + mm)
+  reg_formula <- quote(use ~ tbin + mm - 1)
   model_type = 'TOWTM'
-  if(uniqueN(dat$tbin) < 2){ reg_formula <- quote(use ~ mm); model_type = 'TOWM'}
-  if(uniqueN(dat$mm) < 2){ reg_formula <- quote(use ~ tbin); model_type = 'TOWT'}
+  if(uniqueN(dat$tbin) < 2){ reg_formula <- quote(use ~ mm - 1); model_type = 'TOWM'}
+  if(uniqueN(dat$mm) < 2){ reg_formula <- quote(use ~ tbin - 1); model_type = 'TOWT'}
   if(uniqueN(dat$mm) < 2 & uniqueN(dat$tbin) < 2){ reg_formula <- quote(use ~ 1); model_type = 'TOW'}
 
   mod <- lm(reg_formula,
@@ -22,8 +22,9 @@ regress.hourly <- function(dat, pSet, ...){
                            obs_weights = obs_weights),
                        by = .(tow)],
             weights = obs_weights)
+
   out <- list(mod = mod,
-              towMeans = dat[, .(use = mean(use)), by = .(tow)],
+              towMeans = dat[, .(use = weighted.mean(use, obs_weights)), by = .(tow)],
               model_type = model_type,
               weights = !is.null(pSet$weights))
   structure(out, class = 'regress')
@@ -34,10 +35,9 @@ regress.hourly <- function(dat, pSet, ...){
 #' @export
 predict.regress <- function(mod, dat, ...){
   dat <- copy(dat)
-
   tryCatch({
     mmLevels <- setNames(mod$mod$xlevels$mm, mod$mod$xlevels$mm)
-    msngLevels <- setdiff(levels(dat$mm), mmLevels); names(msngLevels) <- msngLevels
+    msngLevels <- setdiff(unique(dat$mm), mmLevels); names(msngLevels) <- msngLevels
     if(length(msngLevels) > 0){
       lnnDict <- sapply(msngLevels, function(x){
         as.character(mmLevels[which.min(abs(as.numeric(mmLevels) - as.numeric(x)))])

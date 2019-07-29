@@ -84,7 +84,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
 #' @import data.table
 #' @import mlr
 #' @export
-ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), model_options = NULL){
+ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL){
   method <- match.arg(method)
   pSet <- list(max_depth = 3,
                nrounds = seq(200, 1400, 200),
@@ -101,7 +101,13 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest'), model_
               pSet = pSet)
     })
   }
-  if(method != 'regress'){
+  if(method == 'caltrack'){
+    modelList <- lapply(dataList$meterDict, function(meter){
+      caltrack(dat = dataList[['baseline']][[meter]],
+               pSet = pSet)
+    })
+  }
+  if(method %in% c('gboost', 'rforest')){
     modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
                          ivars = dataList[['ivars']][[meter]],
                          pSet = pSet))
