@@ -8,19 +8,19 @@ rforest <- function(dat, ...) UseMethod('rforest')
 #' @import data.table
 #' @import mlr
 #' @export
-rforest.hourly <- function(dat, ivars, pSet){
+rforest.hourly <- function(dat, ivars, model_options){
   dat <- copy(as.data.table(dat))
-  blockFactor <- factor(sort(rep(1:pSet$blocks, length(dat$date))[1:length(dat$date)]))
-  weightsV <- tryCatch(dat[[pSet$weights]], error = function(e) NULL)
+  blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
+  weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
                           data = as.data.frame(dat[, (.SD), .SDcols = c('use', ivars)]),
                           target = 'use',
                           blocking = blockFactor,
                           weights = weightsV)
   paramSpace <- makeParamSet(
-    makeDiscreteParam('ntree', values = pSet$ntree))
+    makeDiscreteParam('ntree', values = model_options$ntree))
   ctrl <- makeTuneControlGrid()
-  rSampleDesc <- makeResampleDesc('CV', iter = pSet$blocks)
+  rSampleDesc <- makeResampleDesc('CV', iter = model_options$blocks)
   tuner <- tuneParams(
     learner = 'regr.randomForest',
     task = regTask,

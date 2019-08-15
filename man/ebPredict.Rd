@@ -5,7 +5,7 @@
 \title{Predictions}
 \usage{
 ebPredict(modelList, dataList, periods = c("pretrial", "baseline",
-  "install", "performance"))
+  "blackout", "performance"))
 }
 \description{
 Predictions

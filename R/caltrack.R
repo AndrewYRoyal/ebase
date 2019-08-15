@@ -6,7 +6,7 @@ caltrack <- function(dat, ...) UseMethod('caltrack')
 #' CalTrack Hourly
 #' @import data.table
 #' @export
-caltrack.hourly <- function(dat, pSet, ...){
+caltrack.hourly <- function(dat, model_options, ...){
   mmDict <- setNames(as.character(unique(dat$mm)), as.character(unique(dat$mm)))
   out <- lapply(mmDict, function(month){
     m_upper <- as.character(as.numeric(month) + 1)
@@ -17,7 +17,7 @@ caltrack.hourly <- function(dat, pSet, ...){
     mdat <- copy(dat)
     mdat[, obs_weights:= weightDict[as.character(mm)]]
     mdat[is.na(obs_weights), obs_weights:= 0]
-    regress(mdat, pSet = list(weights = 'obs_weights'))
+    regress(mdat, model_options = list(weights = 'obs_weights'))
   })
   setattr(out, "class", c('caltrack', 'hourly'))
   return(out)
@@ -28,7 +28,7 @@ caltrack.hourly <- function(dat, pSet, ...){
 #' @export
 predict.caltrack <- function(mod, dat, ...){
   mmDict <- setNames(as.character(unique(dat$mm)), as.character(unique(dat$mm)))
-  
+
   rbindlist(
     lapply(mmDict, function(m){
       predict(mod[[m]], dat[mm == m, ])

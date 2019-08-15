@@ -4,7 +4,7 @@
 \alias{rforest.hourly}
 \title{Hourly random forest}
 \usage{
-\method{rforest}{hourly}(dat, ivars, pSet)
+\method{rforest}{hourly}(dat, ivars, model_options)
 }
 \description{
 Hourly random forest

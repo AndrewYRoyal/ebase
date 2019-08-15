@@ -5,7 +5,7 @@
 \title{Modify formatted data}
 \usage{
 ebModifyData(dataList, FUN, meterSubset = NULL, periods = c("baseline",
-  "install", "performance"))
+  "blackout", "performance"))
 }
 \description{
 Modify formatted data

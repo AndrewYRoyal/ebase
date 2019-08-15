@@ -8,22 +8,22 @@ gboost <- function(dat, ...) UseMethod('gboost')
 #' @import data.table
 #' @import mlr
 #' @export
-gboost.hourly <- function(dat, ivars, pSet){
+gboost.hourly <- function(dat, ivars, model_options){
   dat <- copy(dat)
-  blockFactor <- factor(sort(rep(1:pSet$blocks, length(dat$date))[1:length(dat$date)]))
-  weightsV <- tryCatch(dat[[pSet$weights]], error = function(e) NULL)
+  blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
+  weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
                           data = dat[, (.SD), .SDcols = c('use', ivars)],
                           target = 'use',
                           blocking = blockFactor,
                           weights = weightsV)
   paramSpace <- makeParamSet(
-    makeDiscreteParam('max_depth', values = pSet$max_depth),
-    makeDiscreteParam('nrounds', values = pSet$nrounds),
-    makeDiscreteParam('early_stopping_rounds', values = pSet$early_stopping_rounds),
-    makeDiscreteParam('eta', values = pSet$eta))
+    makeDiscreteParam('max_depth', values = model_options$max_depth),
+    makeDiscreteParam('nrounds', values = model_options$nrounds),
+    makeDiscreteParam('early_stopping_rounds', values = model_options$early_stopping_rounds),
+    makeDiscreteParam('eta', values = model_options$eta))
   ctrl <- makeTuneControlGrid()
-  rSampleDesc <- makeResampleDesc('CV', iter = pSet$blocks)
+  rSampleDesc <- makeResampleDesc('CV', iter = model_options$blocks)
   tuner <- tuneParams(
     learner = 'regr.xgboost',
     task = regTask,
@@ -36,7 +36,7 @@ gboost.hourly <- function(dat, ivars, pSet){
     par.vals = tuner$x)
   xgbModel <- train(learner = xgbLearn, task = regTask)
   structure(
-    list(mod = xgbModel, model_type = 'gboost', weigthed = !is.null(pSet$weights)),
+    list(mod = xgbModel, model_type = 'gboost', weigthed = !is.null(model_options$weights)),
     class = 'gboost')
 }
 

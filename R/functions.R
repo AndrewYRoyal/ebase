@@ -36,7 +36,7 @@ ebDataFormat <- function(x,
   out <- list(
     pretrial = lapply(meterDict, function(meter) dataList[[meter]][['pretrial']]),
     baseline = lapply(meterDict, function(meter) dataList[[meter]][['baseline']]),
-    install = lapply(meterDict, function(meter) dataList[[meter]][['install']]),
+    blackout = lapply(meterDict, function(meter) dataList[[meter]][['blackout']]),
     performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
     meterDict = meterDict,
     siteDict = sites,
@@ -56,7 +56,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
         (date >= max(inDate) + as.difftime(data_options$blackout / 2, units = 'days')) +
         (date >= max(inDate) + as.difftime(data_options$blackout / 2 + data_options$perf_length, units = 'days'))]
   dat <- dat[period > 0 & period < 5, ]
-  pNames <- c('pretrial', 'baseline', 'install', 'performance')
+  pNames <- c('pretrial', 'baseline', 'blackout', 'performance')
   dat[, period:= as.factor(pNames[period])]
   dat[, tow:= .GRP, by = .(wday(date), hour(date))]
   dat[, month:= month(date)]
@@ -71,7 +71,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
   out <- list(
     pretrial = dat[period == 'pretrial', ],
     baseline = dat[period == 'baseline', ],
-    install = dat[period == 'install', ],
+    blackout = dat[period == 'blackout', ],
     performance = dat[period == 'performance', ],
     model = getDays(dat[period == 'baseline', date]) >= data_options$base_min &
       getDays(dat[period == 'performance', date]) >= data_options$perf_min,
@@ -86,33 +86,34 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
 #' @export
 ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL){
   method <- match.arg(method)
-  pSet <- list(max_depth = 3,
-               nrounds = seq(200, 1400, 200),
-               ntree = 1:5 * 50,
-               early_stopping_rounds = 5,
-               eta = 0.1,
-               blocks = 2,
-               cpus = 4,
-               weights = NULL)
-  pSet <- c(pSet[setdiff(names(pSet), names(model_options))], model_options)
+  model_defaults <- list(max_depth = 3,
+                         nrounds = seq(200, 1400, 200),
+                         ntree = 1:5 * 50,
+                         early_stopping_rounds = 5,
+                         eta = 0.1,
+                         blocks = 2,
+                         cpus = 4,
+                         weights = NULL,
+                         custom_lm = NULL)
+  model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
   if(method == 'regress'){
     modelList <- lapply(dataList$meterDict, function(meter){
       regress(dat = dataList[['baseline']][[meter]],
-              pSet = pSet)
+              model_options = model_options)
     })
   }
   if(method == 'caltrack'){
     modelList <- lapply(dataList$meterDict, function(meter){
       caltrack(dat = dataList[['baseline']][[meter]],
-               pSet = pSet)
+               model_options = model_options)
     })
   }
   if(method %in% c('gboost', 'rforest')){
     modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
                          ivars = dataList[['ivars']][[meter]],
-                         pSet = pSet))
+                         model_options = model_options))
     modelCall[[1]] <- as.name(method)
-    parallelMap::parallelStart(mode = 'socket', cpus = pSet$cpus, level = 'mlr.tuneParams')
+    parallelMap::parallelStart(mode = 'socket', cpus = model_options$cpus, level = 'mlr.tuneParams')
     suppressWarnings({
       suppressMessages(
         modelList <- lapply(dataList$meterDict, function(meter){
@@ -129,7 +130,7 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(modelList, dataList, periods = c('pretrial', 'baseline', 'install', 'performance')){
+ebPredict <- function(modelList, dataList, periods = c('pretrial', 'baseline', 'blackout', 'performance')){
   out <- lapply(dataList$meterDict, function(meter){
     rbindlist(
       lapply(periods,
@@ -267,7 +268,7 @@ adjustedN <- function(x, n){
 ebModifyData <- function(dataList,
                          FUN,
                          meterSubset = NULL,
-                         periods = c('baseline', 'install', 'performance')){
+                         periods = c('baseline', 'blackout', 'performance')){
   dataList <- copy(dataList)
   if(is.null(meterSubset)) meterSubset <- dataList$meterDict
   for(period in periods){
@@ -296,7 +297,6 @@ ebDissCalc <- function(dat, method = 'DTWARP'){
 #' Apply Outlier Weights
 #' @import data.table
 #' @export
-
 ebOutlierWeights <- function(dat){
   dat <- copy(dat)
   weightFn <- function(z0, z1, p0, p1){
@@ -309,6 +309,22 @@ ebOutlierWeights <- function(dat){
   dat[, weight:= wt(z)]
   dat[, z:= NULL]
 }
+
+
+#' Add Event
+#' @import data.table
+#' @export
+ebAddEvent <- function(dataList, meter, nre_dates, event_name = 'nre'){
+  nre_dates = as.POSIXct(nre_dates, tz = 'UTC')
+  for(period in c('baseline', 'blackout', 'performance')){
+    dat = copy(dataList[[period]][[meter]])
+    dat[, nre:= as.numeric(date >= min(nre_dates) & date <= max(nre_dates))]
+    setnames(dat, 'nre', event_name)
+    dataList[[period]][[meter]] = dat
+  }
+  dataList
+}
+
 
 
 # curve(wt, from = 0, to = 3)

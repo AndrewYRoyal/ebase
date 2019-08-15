@@ -4,7 +4,7 @@
 \alias{regress.hourly}
 \title{Hourly Regression}
 \usage{
-\method{regress}{hourly}(dat, pSet, ...)
+\method{regress}{hourly}(dat, model_options, ...)
 }
 \description{
 Hourly Regression
