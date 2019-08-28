@@ -13,7 +13,7 @@ caltrack.hourly <- function(dat, model_options, ...){
     m_lower <- as.character(as.numeric(month) - 1)
     if(!(m_upper %in% mmDict)) m_upper <- as.character(min(as.numeric(mmDict)))
     if(!(m_lower %in% mmDict)) m_lower <- as.character(max(as.numeric(mmDict)))
-    weightDict <- setNames(c(0, 1, 0), c(m_lower, month, m_upper))
+    weightDict <- setNames(c(0.5, 1, 0.5), c(m_lower, month, m_upper))
     mdat <- copy(dat)
     mdat[, obs_weights:= weightDict[as.character(mm)]]
     mdat[is.na(obs_weights), obs_weights:= 0]

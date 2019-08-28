@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 lapply(c('data.table'), library, character.only = TRUE)
 
 meterDT <- fread('vignetteData.csv')
-source('C:/Users/Andrew/Dropbox/Res-Intel Model/R_Packages/ebase/ebase/R/functions.R')
+#source('C:/Users/Andrew/Dropbox/Res-Intel Model/R_Packages/ebase/ebase/R/functions.R')
 ```
 The primary purpose of the `ebase` package is to estimate a baseline model of metered energy consumption and to predict metered consumption over a user-specified time period. It is designed to estimate savings attributed to an energy conservation measure (ECM), adhering to the energy modeling and validatation guidelines established by ASHRAE 2014; but it is also suited to any other modeling application that involves hourly metered energy data. Each function in the package is optimized to interpret `data.table` objects that contain data for multiple meters. Working exclusively with `data.table` objects is beneficial because it greatly improves overall performance, making it feasible to scale `ebase` to data for thousands or even millions of meters.
 
