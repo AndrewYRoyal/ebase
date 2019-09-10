@@ -5,13 +5,15 @@ ebDataFormat <- function(x,
                          install_dates,
                          sites = NULL,
                          data_options = NULL,
-                         temp_bins = NULL){
+                         temp_bins = NULL)
+{
   defaults <- list(interval = 'hourly',
                    base_length = 365,
                    perf_length = 365,
                    blackout = 0,
                    base_min = 0,
-                   perf_min = 0)
+                   perf_min = 0,
+                   occupancy_lookup = FALSE)
   data_options <- c(defaults[setdiff(names(defaults), names(data_options))], data_options)
   if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
   meterDict <- setNames(unique(x$meterID), unique(x$meterID))
@@ -48,7 +50,8 @@ ebDataFormat <- function(x,
 #' Meter Format
 #' @import data.table
 #' @export
-ebMeterFormat <- function(dat, inDate, ntbin, data_options){
+ebMeterFormat <- function(dat, inDate, ntbin, data_options)
+{
   dat[, period:=
         (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length + 30, units = 'days')) +
         (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length, units = 'days')) +
@@ -64,7 +67,11 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
   tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
   dat[, tbin:= as.factor(cut(temp, tcuts))]
 
-  getDays <- function(x) uniqueN(as.POSIXct(round(x, 'days')))
+  if(data_options$occupancy_lookup)
+  {
+    ocDT = ebOccupancy(dat[period == 'baseline', ])
+    dat = merge(dat, ocDT, by = c('tow', 'month'))
+  }
   classStr <- list('hourly' = c('hourly'), 'daily' = c('daily', 'hourly'))[[data_options$interval]]
   setattr(dat, "class", c(classStr, class(dat)))
 
@@ -73,8 +80,8 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options){
     baseline = dat[period == 'baseline', ],
     blackout = dat[period == 'blackout', ],
     performance = dat[period == 'performance', ],
-    model = getDays(dat[period == 'baseline', date]) >= data_options$base_min &
-      getDays(dat[period == 'performance', date]) >= data_options$perf_min,
+    model = uniqueN(dat[period == 'baseline', as.Date(date)]) >= data_options$base_min &
+      uniqueN(dat[period == 'performance', as.Date(date)]) >= data_options$perf_min,
     ivars = setdiff(names(dat), c('meterID', 'date', 'use', 'period', 'tbin', 'mm')),
     tcuts = tcuts
   )
@@ -94,7 +101,8 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
                          blocks = 2,
                          cpus = 4,
                          weights = NULL,
-                         custom_lm = NULL)
+                         custom_lm = NULL,
+                         occupancy_lookup = FALSE)
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
   if(method == 'regress'){
     modelList <- lapply(dataList$meterDict, function(meter){
