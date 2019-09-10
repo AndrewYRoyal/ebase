@@ -262,25 +262,6 @@ adjustedN <- function(x, n){
   n*(1 - corr)/(1 + corr)
 }
 
-#' Modify formatted data
-#' @import data.table
-#' @export
-ebModifyData <- function(dataList,
-                         FUN,
-                         meterSubset = NULL,
-                         periods = c('baseline', 'blackout', 'performance')){
-  dataList <- copy(dataList)
-  if(is.null(meterSubset)) meterSubset <- dataList$meterDict
-  for(period in periods){
-    dataList[[period]][meterSubset] <- lapply(dataList[[period]][meterSubset],
-                                              function (dat) structure(FUN(dat), class = class(dat)))
-  }
-  dataList[['ivars']] <- lapply(dataList$meterDict, function(meter){
-    ivars = setdiff(names(dataList[['baseline']][[meter]]), c('meterID', 'date', 'use', 'period', 'tbin', 'mm'))
-  })
-  dataList
-}
-
 #' Calculate Loadpath Distance Matrix
 #' @import TSclust
 #' @import data.table
@@ -325,6 +306,33 @@ ebAddEvent <- function(dataList, meter, nre_dates, event_name = 'nre'){
   dataList
 }
 
+#' Create Occupancy Lookup
+#' @import data.table
+#' @export
+ebOccupancy <- function(dat){
+  mmDict <- setNames(as.character(unique(dat$month)), as.character(unique(dat$month)))
+  rbindlist(
+    lapply(mmDict, function(segment){
+      m_upper <- as.character(as.numeric(segment) + 1)
+      m_lower <- as.character(as.numeric(segment) - 1)
+      if(!(m_upper %in% mmDict)) m_upper <- as.character(min(as.numeric(mmDict)))
+      if(!(m_lower %in% mmDict)) m_lower <- as.character(max(as.numeric(mmDict)))
+      weightDict <- setNames(c(0.5, 1, 0.5), c(m_lower, segment, m_upper))
 
-
-# curve(wt, from = 0, to = 3)
+      out = dat[, .(date,
+                    use,
+                    tow,
+                    cdh = as.numeric(temp > 65) * (temp - 65),
+                    hdh = as.numeric(temp < 50) * (50 - temp),
+                    month,
+                    weight = weightDict[as.character(month)])]
+      out[is.na(weight), weight:= 0]
+      out[, res:= lm('use ~ cdh + hdh', data = out, weights = weight)$residuals]
+      out = out[as.character(month) == segment,
+                .(month = as.numeric(segment),
+                  occupied = mean(as.numeric(res > 0)) > 0.65),
+                by = .(tow)]
+      out
+    })
+  )
+}
