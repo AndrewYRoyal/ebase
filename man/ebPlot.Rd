@@ -4,7 +4,7 @@
 \alias{ebPlot}
 \title{Plot Meter Data}
 \usage{
-ebPlot(x, compress = TRUE)
+ebPlot(x, ...)
 }
 \description{
 Plot Meter Data

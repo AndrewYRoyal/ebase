@@ -212,30 +212,6 @@ ebSummary <- function(predictions, siteDict){
               Sites = list(metrics = siteMetrics,
                            savings = siteSavings)))
 }
-#' Plot Meter Data
-#' @import data.table
-#' @import dygraphs
-#' @export
-ebPlot <- function(x, compress = TRUE){
-  dat <- copy(x)
-  setnames(dat, c('use', 'pUse'), c('Actual', 'Predicted'))
-  datesV <- c(
-    min(dat[period == 'baseline', date]),
-    max(dat[period == 'baseline', date]),
-    min(dat[period == 'performance', date]),
-    max(dat[period == 'performance', date]))
-  if(compress) dat <- dat[, lapply(.SD, sum),
-                          .SDcols = c('Actual', 'Predicted'),
-                          by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
-  dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
-    dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = 'black') %>%
-    dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = '#4889ce') %>%
-    dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
-    dyEvent(datesV[2]) %>%
-    dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
-    dyEvent(datesV[1], 'Pre-Trial', labelLoc = "top") %>%
-    dyLegend(width = 400)
-}
 
 #' R2 calculation
 #' @export
@@ -344,3 +320,37 @@ ebOccupancy <- function(dat){
     })
   )
 }
+
+#' Plot Meter Data
+#' @import data.table
+#' @export
+ebPlot <- function(x, ...) UseMethod('ebPlot')
+
+#' Plot Predictions
+#' @import data.table
+#' @import dygraphs
+#' @export
+ebPlot.data.table <- function(x, compress = TRUE){
+  dat <- copy(x)
+  setnames(dat, c('use', 'pUse'), c('Actual', 'Predicted'))
+  datesV <- c(
+    min(dat[period == 'baseline', date]),
+    max(dat[period == 'baseline', date]),
+    min(dat[period == 'performance', date]),
+    max(dat[period == 'performance', date]))
+  if(compress) dat <- dat[, lapply(.SD, sum),
+                          .SDcols = c('Actual', 'Predicted'),
+                          by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
+  dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
+    dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = 'black') %>%
+    dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = '#4889ce') %>%
+    dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
+    dyEvent(datesV[2]) %>%
+    dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
+    dyEvent(datesV[1], 'Pre-Trial', labelLoc = "top") %>%
+    dyLegend(width = 400)
+}
+
+
+
+
