@@ -42,7 +42,6 @@ ebDataFormat <- function(x,
     performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
     meterDict = meterDict,
     siteDict = sites,
-    ivars = lapply(meterDict, function(meter) dataList[[meter]][['ivars']]),
     tcuts = lapply(meterDict, function(meter) dataList[[meter]][['tcuts']]))
   out
 }
@@ -65,7 +64,11 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
   tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
+
   dat[, tbin:= as.factor(cut(temp, tcuts))]
+  qtemp = unname(c(0, quantile(dat$temp, 1:ntbin / ntbin))[1:(ntbin + 1)])
+  qtempList = lapply(1:ntbin, function(x) c(min = qtemp[x], max = qtemp[x + 1] - qtemp[x]))
+  dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q) pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max']))]
 
   if(data_options$occupancy_lookup)
   {
@@ -82,10 +85,11 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
     performance = dat[period == 'performance', ],
     model = uniqueN(dat[period == 'baseline', as.Date(date)]) >= data_options$base_min &
       uniqueN(dat[period == 'performance', as.Date(date)]) >= data_options$perf_min,
-    ivars = setdiff(names(dat), c('meterID', 'date', 'use', 'period', 'tbin', 'mm')),
     tcuts = tcuts
   )
 }
+
+
 
 #' Baseline Model
 #' @import data.table
@@ -102,7 +106,8 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
                          cpus = 4,
                          weights = NULL,
                          custom_lm = NULL,
-                         occupancy_lookup = FALSE)
+                         occupancy_lookup = FALSE,
+                         ivars = NULL)
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
   if(method == 'regress'){
     modelList <- lapply(dataList$meterDict, function(meter){
@@ -113,12 +118,13 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
   if(method == 'caltrack'){
     modelList <- lapply(dataList$meterDict, function(meter){
       caltrack(dat = dataList[['baseline']][[meter]],
+               ntbins = length(dataList[['tcuts']][[meter]]) - 1,
                model_options = model_options)
     })
   }
   if(method %in% c('gboost', 'rforest')){
+    if(is.null(model_options$ivars)) stop('Error: Must specificy ivars for gboost and rforest methods.')
     modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
-                         ivars = dataList[['ivars']][[meter]],
                          model_options = model_options))
     modelCall[[1]] <- as.name(method)
     parallelMap::parallelStart(mode = 'socket', cpus = model_options$cpus, level = 'mlr.tuneParams')
@@ -143,8 +149,7 @@ ebPredict <- function(modelList, dataList, periods = c('pretrial', 'baseline', '
     rbindlist(
       lapply(periods,
              function(period) predict(mod = modelList[[meter]],
-                                      dat = dataList[[period]][[meter]],
-                                      ivars = dataList[['ivars']][[meter]])),
+                                      dat = dataList[[period]][[meter]])),
       fill = TRUE)[, .(meterID, date, period, use, pUse)]
   })
   out
@@ -301,7 +306,7 @@ ebOccupancy <- function(dat){
       m_lower <- as.character(as.numeric(segment) - 1)
       if(!(m_upper %in% mmDict)) m_upper <- as.character(min(as.numeric(mmDict)))
       if(!(m_lower %in% mmDict)) m_lower <- as.character(max(as.numeric(mmDict)))
-      weightDict <- setNames(c(0.5, 1, 0.5), c(m_lower, segment, m_upper))
+      weightDict <- setNames(c(0, 1, 0), c(m_lower, segment, m_upper))
 
       out = dat[, .(date,
                     use,

@@ -8,12 +8,12 @@ gboost <- function(dat, ...) UseMethod('gboost')
 #' @import data.table
 #' @import mlr
 #' @export
-gboost.hourly <- function(dat, ivars, model_options){
+gboost.hourly <- function(dat, model_options){
   dat <- copy(dat)
   blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
   weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
-                          data = dat[, (.SD), .SDcols = c('use', ivars)],
+                          data = dat[, (.SD), .SDcols = c('use', model_options$ivars)],
                           target = 'use',
                           blocking = blockFactor,
                           weights = weightsV)
@@ -36,7 +36,7 @@ gboost.hourly <- function(dat, ivars, model_options){
     par.vals = tuner$x)
   xgbModel <- train(learner = xgbLearn, task = regTask)
   structure(
-    list(mod = xgbModel, model_type = 'gboost', weigthed = !is.null(model_options$weights)),
+    list(mod = xgbModel, model_type = 'gboost', ivars = model_options$ivars, weighted = !is.null(model_options$weights)),
     class = 'gboost')
 }
 
@@ -45,12 +45,11 @@ gboost.hourly <- function(dat, ivars, model_options){
 #' @import data.table
 #' @import mlr
 #' @export
-predict.gboost <- function(mod, dat, ivars){
+predict.gboost <- function(mod, dat){
   predDT <- copy(dat)
   suppressWarnings({
-    predDT[, pUse:= predict(mod$mod, newdata = (dat[, (ivars), with = FALSE]))$data$response]
+    predDT[, pUse:= predict(mod$mod, newdata = (dat[, (mod$ivars), with = FALSE]))$data$response]
   })
-
   predDT
 }
 

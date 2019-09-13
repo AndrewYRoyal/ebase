@@ -6,10 +6,13 @@ caltrack <- function(dat, ...) UseMethod('caltrack')
 #' CalTrack Hourly
 #' @import data.table
 #' @export
-caltrack.hourly <- function(dat, model_options, ...){
+caltrack.hourly <- function(dat, model_options, ntbins,...){
   mmDict <- setNames(as.character(unique(dat$mm)), as.character(unique(dat$mm)))
-  custom_lm = 'use ~ tbin - 1'
-  if(model_options$occupancy_lookup) custom_lm = 'use ~ tbin:occupied - 1'
+  custom_lm = paste0('use ~ tow - 1 +',
+                     paste0('tbin_', 1:ntbins, collapse = '+'))
+  if(model_options$occupancy_lookup) custom_lm = paste0('use ~ tow - 1 +',
+                                                        paste0('tbin_', 1:ntbins, collapse = '+'), '+',
+                                                        paste0('occupied:tbin_', 1:ntbins, collapse = '+'))
   out <- lapply(mmDict, function(month){
     m_upper <- as.character(as.numeric(month) + 1)
     m_lower <- as.character(as.numeric(month) - 1)

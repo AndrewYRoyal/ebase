@@ -13,7 +13,7 @@ rforest.hourly <- function(dat, ivars, model_options){
   blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
   weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
-                          data = as.data.frame(dat[, (.SD), .SDcols = c('use', ivars)]),
+                          data = as.data.frame(dat[, (.SD), .SDcols = c('use', model_options$ivars)]),
                           target = 'use',
                           blocking = blockFactor,
                           weights = weightsV)
@@ -31,6 +31,6 @@ rforest.hourly <- function(dat, ivars, model_options){
   xgbLearn <- setHyperPars(
     makeLearner('regr.randomForest'),
     par.vals = tuner$x)
-  xgbModel <- train(learner = xgbLearn, task = regTask)
+  xgbModel <- train(learner = xgbLearn, ivars = model_options$ivars, task = regTask)
   structure(list(mod = xgbModel), class = c('rforest', 'gboost'))
 }

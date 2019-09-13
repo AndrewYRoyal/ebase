@@ -4,7 +4,7 @@
 \alias{gboost.hourly}
 \title{Hourly Gradient Boost}
 \usage{
-\method{gboost}{hourly}(dat, ivars, model_options)
+\method{gboost}{hourly}(dat, model_options)
 }
 \description{
 Hourly Gradient Boost

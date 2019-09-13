@@ -4,7 +4,7 @@
 \alias{predict.gboost}
 \title{GBoost Predict}
 \usage{
-\method{predict}{gboost}(mod, dat, ivars)
+\method{predict}{gboost}(mod, dat)
 }
 \description{
 GBoost Predict
