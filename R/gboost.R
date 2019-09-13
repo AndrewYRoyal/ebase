@@ -9,6 +9,7 @@ gboost <- function(dat, ...) UseMethod('gboost')
 #' @import mlr
 #' @export
 gboost.hourly <- function(dat, model_options){
+  configureMlr(on.error.dump = FALSE)
   dat <- copy(dat)
   blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
   weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
@@ -31,8 +32,9 @@ gboost.hourly <- function(dat, model_options){
     par.set = paramSpace,
     control = ctrl,
     show.info = FALSE)
+
   xgbLearn <- setHyperPars(
-    makeLearner('regr.xgboost', verbose = 0, nthread = 8),
+    makeLearner('regr.xgboost', verbose = 0),
     par.vals = tuner$x)
   xgbModel <- train(learner = xgbLearn, task = regTask)
   structure(

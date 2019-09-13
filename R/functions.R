@@ -89,11 +89,10 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   )
 }
 
-
-
 #' Baseline Model
 #' @import data.table
 #' @import mlr
+#' @import parallelMap
 #' @export
 ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL){
   method <- match.arg(method)
@@ -109,14 +108,19 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
                          occupancy_lookup = FALSE,
                          ivars = NULL)
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
+  parallelStartSocket(model_options$cpus)
+  parallelLibrary('ebase')
+  parallelLibrary('mlr')
+  parallelLibrary('ParamHelpers')
+
   if(method == 'regress'){
-    modelList <- lapply(dataList$meterDict, function(meter){
+    modelList <- parallelLapply(dataList$meterDict, function(meter){
       regress(dat = dataList[['baseline']][[meter]],
               model_options = model_options)
     })
   }
   if(method == 'caltrack'){
-    modelList <- lapply(dataList$meterDict, function(meter){
+    modelList <- parallelLapply(dataList$meterDict, function(meter){
       caltrack(dat = dataList[['baseline']][[meter]],
                ntbins = length(dataList[['tcuts']][[meter]]) - 1,
                model_options = model_options)
@@ -127,17 +131,12 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
     modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
                          model_options = model_options))
     modelCall[[1]] <- as.name(method)
-    parallelMap::parallelStart(mode = 'socket', cpus = model_options$cpus, level = 'mlr.tuneParams')
-    suppressWarnings({
-      suppressMessages(
-        modelList <- lapply(dataList$meterDict, function(meter){
+    modelList <- parallelMap::parallelLapply(dataList$meterDict, function(meter){
           eval(modelCall)
-        })
-      )
     })
-    parallelMap::parallelStop()
   }
-  modelList
+  parallelMap::parallelStop()
+  setNames(modelList, dataList$meterDict)
 }
 
 #' Predictions
