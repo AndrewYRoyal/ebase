@@ -17,11 +17,12 @@ regress.hourly <- function(dat, model_options, ...)
   if(uniqueN(dat$mm) < 2 & uniqueN(dat$tbin) < 2){ reg_formula <- quote(use ~ tow); model_type = 'TOW'}
   if(!is.null(model_options$custom_lm)){ reg_formula <- model_options$custom_lm; model_type = 'custom'}
   dat[, tow:= as.factor(tow)]
-  mod <- lm(reg_formula,
-            data = dat,
-            weights = obs_weights)
-  out <- list(mod = strip_lm(mod),
-              towMeans = unique(dat[, .(tow, use)]),
+  mod <- strip_lm(lm(reg_formula,
+                     data = dat,
+                     weights = obs_weights,
+                     model = FALSE,
+                     y = FALSE))
+  out <- list(mod = mod,
               model_type = model_type,
               weights = !is.null(model_options$weights))
   structure(out, class = 'regress')

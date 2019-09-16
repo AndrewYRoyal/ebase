@@ -345,9 +345,7 @@ strip_lm = function(x)
   x$residuals <- NULL
   x$effects <- NULL
   x$qr$qr <- NULL
+  attr(x$terms,".Environment") = c()
+  attr(x$formula,".Environment") = c()
   x
 }
-
-
-
-
