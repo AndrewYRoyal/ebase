@@ -6,7 +6,8 @@ regress <- function(dat, ...) UseMethod('regress')
 #' Hourly Regression
 #' @import data.table
 #' @export
-regress.hourly <- function(dat, model_options, ...){
+regress.hourly <- function(dat, model_options, ...)
+{
   dat <- copy(dat)
   if(is.null(model_options$weights)) dat[, obs_weights:= 1] else setnames(dat, model_options$weights, 'obs_weights')
   reg_formula <- quote(use ~ tow + tbin + mm - 1)
@@ -19,8 +20,8 @@ regress.hourly <- function(dat, model_options, ...){
   mod <- lm(reg_formula,
             data = dat,
             weights = obs_weights)
-  out <- list(mod = mod,
-              towMeans = unique(dat[, .(tow, use)]), # = mUse)]),
+  out <- list(mod = strip_lm(mod),
+              towMeans = unique(dat[, .(tow, use)]),
               model_type = model_type,
               weights = !is.null(model_options$weights))
   structure(out, class = 'regress')
@@ -29,7 +30,8 @@ regress.hourly <- function(dat, model_options, ...){
 #' Regression Predict
 #' @import data.table
 #' @export
-predict.regress <- function(mod, dat, ...){
+predict.regress <- function(mod, dat, ...)
+{
   dat <- copy(dat)
   tryCatch(
   {
@@ -47,4 +49,5 @@ predict.regress <- function(mod, dat, ...){
   dat[, pUse:= predict(mod$mod, dat)]
   dat[, .(meterID, date, period, use, pUse)]
 }
+
 

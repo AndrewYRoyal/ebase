@@ -94,7 +94,8 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
 #' @import mlr
 #' @import parallelMap
 #' @export
-ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL){
+ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL)
+{
   method <- match.arg(method)
   model_defaults <- list(max_depth = 3,
                          nrounds = seq(200, 1400, 200),
@@ -108,35 +109,9 @@ ebModel <- function(dataList, method = c('regress', 'gboost', 'rforest', 'caltra
                          occupancy_lookup = FALSE,
                          ivars = NULL)
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
-  parallelStartSocket(model_options$cpus)
-  parallelLibrary('ebase')
-  parallelLibrary('mlr')
-  parallelLibrary('ParamHelpers')
-
-  if(method == 'regress'){
-    modelList <- parallelLapply(dataList$meterDict, function(meter){
-      regress(dat = dataList[['baseline']][[meter]],
-              model_options = model_options)
-    })
-  }
-  if(method == 'caltrack'){
-    modelList <- parallelLapply(dataList$meterDict, function(meter){
-      caltrack(dat = dataList[['baseline']][[meter]],
-               ntbins = length(dataList[['tcuts']][[meter]]) - 1,
-               model_options = model_options)
-    })
-  }
-  if(method %in% c('gboost', 'rforest')){
-    if(is.null(model_options$ivars)) stop('Error: Must specificy ivars for gboost and rforest methods.')
-    modelCall <- quote(f(dat = dataList[['baseline']][[meter]],
-                         model_options = model_options))
-    modelCall[[1]] <- as.name(method)
-    modelList <- parallelMap::parallelLapply(dataList$meterDict, function(meter){
-          eval(modelCall)
-    })
-  }
-  parallelMap::parallelStop()
-  setNames(modelList, dataList$meterDict)
+  modelCall <- quote(f(dat = dat, model_options = model_options))
+  modelCall[[1]] <- as.name(method)
+  eval(modelCall)
 }
 
 #' Predictions
@@ -353,6 +328,24 @@ ebPlot.data.table <- function(x, compress = TRUE){
     dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
     dyEvent(datesV[1], 'Pre-Trial', labelLoc = "top") %>%
     dyLegend(width = 400)
+}
+
+#' Reduce size of linear model
+#' @import data.table
+#' @export
+strip_lm = function(x)
+{
+  x$data <- NULL
+  x$y <- NULL
+  x$linear.predictors <- NULL
+  x$weights <- NULL
+  x$fitted.values <- NULL
+  x$model <- NULL
+  x$prior.weights <- NULL
+  x$residuals <- NULL
+  x$effects <- NULL
+  x$qr$qr <- NULL
+  x
 }
 
 

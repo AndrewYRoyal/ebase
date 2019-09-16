@@ -4,7 +4,7 @@
 \alias{caltrack.hourly}
 \title{CalTrack Hourly}
 \usage{
-\method{caltrack}{hourly}(dat, model_options, ntbins, ...)
+\method{caltrack}{hourly}(dat, model_options, ...)
 }
 \description{
 CalTrack Hourly

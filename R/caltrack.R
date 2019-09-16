@@ -6,8 +6,10 @@ caltrack <- function(dat, ...) UseMethod('caltrack')
 #' CalTrack Hourly
 #' @import data.table
 #' @export
-caltrack.hourly <- function(dat, model_options, ntbins,...){
+caltrack.hourly <- function(dat, model_options,...)
+{
   mmDict <- setNames(as.character(unique(dat$mm)), as.character(unique(dat$mm)))
+  ntbins <- uniqueN(dat$tbin)
   custom_lm = paste0('use ~ tow - 1 +',
                      paste0('tbin_', 1:ntbins, collapse = '+'))
   if(model_options$occupancy_lookup) custom_lm = paste0('use ~ tow - 1 +',
@@ -31,7 +33,8 @@ caltrack.hourly <- function(dat, model_options, ntbins,...){
 #' CalTrack Predict
 #' @import data.table
 #' @export
-predict.caltrack <- function(mod, dat, ...){
+predict.caltrack <- function(mod, dat, ...)
+{
   mmDict <- setNames(as.character(unique(dat$mm)), as.character(unique(dat$mm)))
 
   rbindlist(
