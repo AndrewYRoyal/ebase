@@ -28,17 +28,16 @@ ebTempProf = function(dat, balance_points = NULL, dm_vars = NULL)
       summary(lmodel)$r.squared
     },
     bh = bh, bc = bc, frmla = frmla)]
-
   bc_opt = balance_points[which.max(r2)]$bc
   bh_opt = balance_points[which.max(r2)]$bh
   frmla = balance_points[which.max(r2)]$frmla
   r2 = max(balance_points$r2)
+  if(r2 < 0.10) frmla = 'use ~ 1'
   dat = dat[, .(use = use,
                 temp,
                 cd = as.numeric(temp > bc_opt) * (temp - bc_opt),
                 hd = as.numeric(temp < bh_opt) * (bh_opt - temp))]
   lmodel = lm(frmla, data = dat)
-
   mtype = c('use ~ cd + hd' = 'Heating and Cooling',
             'use ~ cd' = 'Cooling',
             'use ~ hd' = 'Heating',
