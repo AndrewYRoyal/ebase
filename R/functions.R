@@ -26,18 +26,20 @@ ebDataFormat <- function(
   no_tbin <- setdiff(meterDict, names(temp_bins))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
-  parallelStartSocket(cpus)
-  parallelLibrary('ebase')
-  dataList <- parallelLapply(
-    meterDict,
-    function(m){
-      ebMeterFormat(dat = x[meterID == m, ],
-                    inDate = install_dates[[m]],
-                    ntbin = temp_bins[m],
-                    data_options = data_options)
-  })
-  parallelStop()
-  dataList <- setNames(dataList, meterDict)
+  applyCall <- quote(f(meterDict,  function(m){
+    ebMeterFormat(dat = x[meterID == m, ],
+                  inDate = install_dates[[m]],
+                  ntbin = temp_bins[m],
+                  data_options = data_options)
+    }))
+  applyCall[[1]] <- as.name('lapply')
+  if(cpus > 1){
+    parallelStartSocket(cpus)
+    parallelLibrary('ebase')
+    applyCall[[1]] <- as.name('parallelLapply')
+  }
+  dataList <- eval(applyCall)
+  if(cpus > 1) parallelStop(); dataList <- setNames(dataList, meterDict)
 
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
   cat(length(meterDict), 'with sufficient data \n')
