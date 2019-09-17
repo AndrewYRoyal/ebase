@@ -59,7 +59,7 @@ ebTempProf = function(dat, balance_points = NULL, dm_vars = NULL)
 #' @import data.table
 #' @import ggplot2
 #' @export
-ebPlot.tprofile = function(x)
+ebPlot.tprofile = function(x, data_only = FALSE)
 {
   temp_range = seq(round(min(x$dat$temp)), round(max(x$dat$temp)), by = 0.1)
   dat = data.table(
@@ -67,12 +67,58 @@ ebPlot.tprofile = function(x)
     cd = as.numeric(temp_range > x$bc) * (temp_range - x$bc),
     hd = as.numeric(temp_range < x$bh) * (x$bh - temp_range))
   dat[, use:= predict(x$model, dat, type = 'response')]
+  if(data_only) return(list(curve = dat[, .(temp, use, mtype = x$mtype)], points = x$dat))
   ggplot(data = dat, aes(x = temp, y = use)) +
     theme_light(base_size = 14) +
     geom_point(data = x$dat, aes(x = temp, y = use)) +
+    scale_x_continuous('Outside Temperature') +
+    scale_y_continuous('kWh') +
     geom_line(size = 1.5,
               color = c('Cooling' = 'royalblue',
                         'Heating' = 'red',
                         'Heating and Cooling' = 'green',
                         'Baseload Only' = 'black')[x$mtype])
 }
+
+#' Facet Plot Hourly Temperature Profile
+#' @import data.table
+#' @import ggplot2
+#' @export
+ebHourlyTempFacet <- function(dat, hours = c(0:11 * 2))
+{
+  hour_levels = c(paste0(c(12, 1:11), 'AM'), paste0(c(12, 1:11), 'PM'))
+  balance_points = as.data.table(expand.grid(bh = seq(40, 70, 3),
+                                             bc = seq(60, 90, 3)))
+  balance_points = balance_points[bh < bc]
+  balance_points = rbindlist(
+    list(balance_points[, .(bh = bh, bc = bc, frmla = 'use ~ cd + hd')],
+         unique(balance_points[, .(bh = NA, bc = bc, frmla = 'use ~ cd')]),
+         unique(balance_points[, .(bh = bh, bc = NA, frmla = 'use ~ hd')])))
+
+  tempList = lapply(hours, function(hr){
+    out = ebPlot(ebTempProf(dat = dat[hour(date) == hr, ], balance_points = balance_points),
+                 data_only = TRUE)
+    lapply(out, function(x) x[, hour:= hr])
+  })
+  curve_dat = rbindlist(lapply(tempList, function(x) x[['curve']]))
+  points_dat = rbindlist(lapply(tempList, function(x) x[['points']]))
+
+  curve_dat[, hour:= factor(hour_levels[hour + 1], levels = hour_levels)]
+  points_dat[, hour:= factor(hour_levels[hour + 1], levels = hour_levels)]
+
+  colorDict = c('Cooling' = 'royalblue',
+                'Heating' = 'red',
+                'Heating and Cooling' = 'darkorange',
+                'Baseload Only' = 'black')
+  ggplot(data = curve_dat, aes(x = temp, y = use, color = mtype)) +
+    theme_light(base_size = 15) +
+    theme(legend.position = 'top') +
+    geom_line(size = 0.5) +
+    geom_point(data = points_dat, color = 'gray', aes(x = temp, y = use)) +
+    geom_line(size = 1.5) +
+    scale_color_manual('', values = colorDict) +
+    scale_x_continuous('Outside Temperature') +
+    scale_y_continuous('kWh') +
+    facet_wrap(~hour)
+}
+
