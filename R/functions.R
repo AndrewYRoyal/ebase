@@ -1,11 +1,14 @@
 #' Data Format
 #' @import data.table
+#' @import parallelMap
 #' @export
-ebDataFormat <- function(x,
-                         install_dates,
-                         sites = NULL,
-                         data_options = NULL,
-                         temp_bins = NULL)
+ebDataFormat <- function(
+  x,
+  install_dates,
+  sites = NULL,
+  data_options = NULL,
+  temp_bins = NULL,
+  cpus = 1)
 {
   defaults <- list(interval = 'hourly',
                    base_length = 365,
@@ -23,7 +26,9 @@ ebDataFormat <- function(x,
   no_tbin <- setdiff(meterDict, names(temp_bins))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
-  dataList <- lapply(
+  parallelStartSocket(cpus)
+  parallelLibrary('ebase')
+  dataList <- parallelLapply(
     meterDict,
     function(m){
       ebMeterFormat(dat = x[meterID == m, ],
@@ -31,6 +36,9 @@ ebDataFormat <- function(x,
                     ntbin = temp_bins[m],
                     data_options = data_options)
   })
+  parallelStop()
+  dataList <- setNames(dataList, meterDict)
+
   meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
   cat(length(meterDict), 'with sufficient data \n')
   sites <- sites[names(sites) %in% meterDict]
@@ -118,7 +126,12 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack'),
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(modelList, dataList, periods = c('pretrial', 'baseline', 'blackout', 'performance')){
+ebPredict <- function(
+  modelList,
+  dataList,
+  periods = c('pretrial', 'baseline', 'blackout', 'performance'))
+{
+
   out <- lapply(dataList$meterDict, function(meter){
     rbindlist(
       lapply(periods,
