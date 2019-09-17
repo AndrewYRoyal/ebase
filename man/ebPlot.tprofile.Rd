@@ -4,7 +4,7 @@
 \alias{ebPlot.tprofile}
 \title{Plot Temperature Profile}
 \usage{
-\method{ebPlot}{tprofile}(x)
+\method{ebPlot}{tprofile}(x, data_only = FALSE)
 }
 \description{
 Plot Temperature Profile
