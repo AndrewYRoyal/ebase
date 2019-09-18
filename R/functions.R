@@ -104,7 +104,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
 #' @import mlr
 #' @import parallelMap
 #' @export
-ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack'), model_options = NULL)
+ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 'hybrid'), model_options = NULL)
 {
   method <- match.arg(method)
   model_defaults <- list(max_depth = 3,

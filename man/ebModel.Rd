@@ -4,8 +4,8 @@
 \alias{ebModel}
 \title{Baseline Model}
 \usage{
-ebModel(dat, method = c("regress", "gboost", "rforest", "caltrack"),
-  model_options = NULL)
+ebModel(dat, method = c("regress", "gboost", "rforest", "caltrack",
+  "hybrid"), model_options = NULL)
 }
 \description{
 Baseline Model
