@@ -75,7 +75,7 @@ ebPlot.tprofile = function(x, data_only = FALSE)
     geom_line(size = 1.5,
               color = c('Cooling' = 'royalblue',
                         'Heating' = 'red',
-                        'Heating and Cooling' = 'green',
+                        'Heating and Cooling' = 'darkorange',
                         'Baseload Only' = 'black')[x$mtype])
 }
 
