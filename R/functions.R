@@ -121,6 +121,7 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
   modelCall <- quote(f(dat = dat, model_options = model_options))
   modelCall[[1]] <- as.name(method)
+  cat('X')
   eval(modelCall)
 }
 
