@@ -4,6 +4,8 @@
 #' @export
 gboost <- function(dat, ...) UseMethod('gboost')
 
+mlr::getLearnerParamSet('regr.xgboost')
+
 #' Hourly Gradient Boost
 #' @import data.table
 #' @import mlr
@@ -22,6 +24,7 @@ gboost.hourly <- function(dat, model_options){
     makeDiscreteParam('max_depth', values = model_options$max_depth),
     makeDiscreteParam('nrounds', values = model_options$nrounds),
     makeDiscreteParam('early_stopping_rounds', values = model_options$early_stopping_rounds),
+    makeDiscreteParam('nthread', values = 1),
     makeDiscreteParam('eta', values = model_options$eta))
   ctrl <- makeTuneControlGrid()
   rSampleDesc <- makeResampleDesc('CV', iter = model_options$blocks)
