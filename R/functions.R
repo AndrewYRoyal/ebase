@@ -364,3 +364,5 @@ strip_lm = function(x)
   attr(x$formula,".Environment") = c()
   x
 }
+
+
