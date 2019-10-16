@@ -172,7 +172,7 @@ ebSummary <- function(predictions, siteDict = NULL){
                         by = .(site = siteDict[meterID])]
     site_savings = meter_savings[, lapply(.SD, sum),
                                  .SDcols = c('Savings', 'varSavings'),
-                                 by = .(site = siteDict[meterID])]
+                                 by = .(site = as.character(siteDict[meterID]))]
   }
 
   return(list(Meters = list(metrics = meter_metrics,
