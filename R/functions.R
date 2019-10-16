@@ -169,7 +169,7 @@ ebSummary <- function(predictions, siteDict = NULL){
                              CVRMSE = CVRMSE(use, pUse),
                              NMBE = NMBE(use, pUse),
                              Annual = sum(use)),
-                        by = .(site = siteDict[meterID])]
+                        by = .(site = as.character(siteDict[meterID]))]
     site_savings = meter_savings[, lapply(.SD, sum),
                                  .SDcols = c('Savings', 'varSavings'),
                                  by = .(site = as.character(siteDict[meterID]))]
