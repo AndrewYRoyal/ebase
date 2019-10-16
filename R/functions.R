@@ -113,6 +113,7 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 
                          early_stopping_rounds = 200,
                          eta = 0.1,
                          blocks = 2,
+                         block_on_week = FALSE,
                          weights = NULL,
                          custom_lm = NULL,
                          occupancy_lookup = FALSE,
@@ -128,10 +129,9 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(
-  modelList,
-  dataList,
-  periods = c('pretrial', 'baseline', 'blackout', 'performance'))
+ebPredict <- function(modelList,
+                      dataList,
+                      periods = c('pretrial', 'baseline', 'blackout', 'performance'))
 {
 
   out <- lapply(dataList$meterDict, function(meter){
@@ -144,67 +144,41 @@ ebPredict <- function(
   out
 }
 
-#' Baseline Metrics Summary
-#' @import data.table
-#' @export
-ebBaselineSummary <- function(dat){
-  dat[period == 'baseline', list(
-    meterID = unique(meterID),
-    R2 = R2(use, pUse),
-    CVRMSE = CVRMSE(use, pUse),
-    NMBE = NMBE(use, pUse),
-    baselineDays = uniqueN(as.POSIXct(round(date, 'days'))),
-    Annual = sum(use))]
-}
-#' Saving Summary
-#' @import data.table
-#' @export
-ebSavingSummary <- function(dat){
-  dat[period == 'performance', list(
-    meterID = unique(meterID),
-    Savings = sum(pUse - use),
-    varSavings = varCalc(use, pUse),
-    performanceDays = uniqueN(as.POSIXct(round(date, 'days'))))]
-}
-
 #' Prediction and Savings Summary
 #' @import data.table
 #' @export
-ebSummary <- function(predictions, siteDict){
-  metricsList <- lapply(predictions, function(x){
-    ebBaselineSummary(x)
-  })
-  savingList <- lapply(predictions, function(x){
-    ebSavingSummary(x)
-  })
+ebSummary <- function(predictions, siteDict = NULL){
 
-  siteDT <- rbindlist(
-    lapply(predictions, function(dat){
-      dat <- copy(dat)
-      dat[, site:= siteDict[meterID]]
-      dat
-    })
-  )
-  siteMetrics <- rbindlist(
-    lapply(unique(siteDict), function(s){
-      dat <- ebBaselineSummary(siteDT[site == s, ])
-      dat[, meterID:= NULL]
-      dat[, site:= s]
-      unique(dat)
-    })
-  )
-  siteSavings <- rbindlist(
-    lapply(unique(siteDict), function(s){
-      dat <- ebSavingSummary(siteDT[site == s, ])
-      dat[, meterID:= NULL]
-      dat[, site:= s]
-      unique(dat)
-    })
-  )
-  return(list(Meters = list(metrics = rbindlist(metricsList),
-                            savings = rbindlist(savingList)),
-              Sites = list(metrics = siteMetrics,
-                           savings = siteSavings)))
+  dat <- rbindlist(predictions)
+  meter_metrics <- dat[period == 'baseline',
+                       list(R2 = R2(use, pUse),
+                            CVRMSE = CVRMSE(use, pUse),
+                            NMBE = NMBE(use, pUse),
+                            Annual = sum(use)),
+                       by = .(meterID)]
+  meter_savings <- dat[period == 'performance',
+                       list(Savings = sum(pUse - use),
+                            varSavings = varCalc(use, pUse)),
+                       by = .(meterID)]
+
+  site_metrics <- NULL; site_savings <- NULL
+  if(!is.null(siteDict))
+  {
+    site_metrics <- dat[period == 'baseline',
+                        list(R2 = R2(use, pUse),
+                             CVRMSE = CVRMSE(use, pUse),
+                             NMBE = NMBE(use, pUse),
+                             Annual = sum(use)),
+                        by = .(site = siteDict[meterID])]
+    site_savings = meter_savings[, lapply(.SD, sum),
+                                 .SDcols = c('Savings', 'varSavings'),
+                                 by = .(site = siteDict[meterID])]
+  }
+
+  return(list(Meters = list(metrics = meter_metrics,
+                            savings = meter_savings),
+              Sites = list(metrics = site_metrics,
+                           savings = site_savings)))
 }
 
 #' R2 calculation
@@ -244,7 +218,8 @@ adjustedN <- function(x, n){
 #' @import TSclust
 #' @import data.table
 #' @export
-ebDissCalc <- function(dat, method = 'DTWARP'){
+ebDissCalc <- function(dat, method = 'DTWARP')
+{
   dat <- dcast(dat, yday(date) ~ hour(date), value.var = 'use')
   dat <- na.omit(dat)
   dayV <- dat$date
@@ -256,7 +231,8 @@ ebDissCalc <- function(dat, method = 'DTWARP'){
 #' Apply Outlier Weights
 #' @import data.table
 #' @export
-ebOutlierWeights <- function(dat){
+ebOutlierWeights <- function(dat)
+{
   dat <- copy(dat)
   weightFn <- function(z0, z1, p0, p1){
     b <- (log(1 / p1 - 1) - log(1 / p0 - 1)) / (z1 - z0)
@@ -273,7 +249,8 @@ ebOutlierWeights <- function(dat){
 #' Add Event
 #' @import data.table
 #' @export
-ebAddEvent <- function(dataList, meter, nre_dates, event_name = 'nre'){
+ebAddEvent <- function(dataList, meter, nre_dates, event_name = 'nre')
+{
   nre_dates = as.POSIXct(nre_dates, tz = 'UTC')
   for(period in c('baseline', 'blackout', 'performance')){
     dat = copy(dataList[[period]][[meter]])
@@ -287,7 +264,8 @@ ebAddEvent <- function(dataList, meter, nre_dates, event_name = 'nre'){
 #' Create Occupancy Lookup
 #' @import data.table
 #' @export
-ebOccupancy <- function(dat){
+ebOccupancy <- function(dat)
+{
   mmDict <- setNames(as.character(unique(dat$month)), as.character(unique(dat$month)))
   rbindlist(
     lapply(mmDict, function(segment){
@@ -324,7 +302,8 @@ ebPlot <- function(x, ...) UseMethod('ebPlot')
 #' @import data.table
 #' @import dygraphs
 #' @export
-ebPlot.data.table <- function(x, compress = TRUE){
+ebPlot.data.table <- function(x, compress = TRUE)
+{
   dat <- copy(x)
   setnames(dat, c('use', 'pUse'), c('Actual', 'Predicted'))
   datesV <- c(

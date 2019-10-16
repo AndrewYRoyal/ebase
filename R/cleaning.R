@@ -12,19 +12,19 @@ ebRawConvert <- function(dat, utility = 'sdge', id = c('account', 'meter'))
     numV <- setdiff(names(dat), c('meterID', 'day', 'channel'))
     dat[, (numV):= lapply(.SD, as.numeric), .SDcols = numV]
     dat <- melt(dat,
-                id.vars = c('meterID', 'channel', 'day'), 
+                id.vars = c('meterID', 'channel', 'day'),
                 variable = 'hr',
                 value.name = 'use',
                 variable.factor = FALSE)
     hourDict <- unique(dat$hr); names(hourDict) <- hourDict
-    hourDict <- vapply(hourDict, 
+    hourDict <- vapply(hourDict,
                        function(x) as.numeric(regmatches(x, regexpr('\\d+', x, perl = TRUE))) - 1,
                        FUN.VALUE = numeric(1))
     dat[, hr:= hourDict[hr]]
-    dateDT <- unique(dat[, .(day, hr)])[, .(day, 
-                                            hr, 
+    dateDT <- unique(dat[, .(day, hr)])[, .(day,
+                                            hr,
                                             date = as.POSIXct(paste0(as.Date(day, tz = 'UTC'), ' ', hr),
-                                                              tz = 'UTC', 
+                                                              tz = 'UTC',
                                                               format = '%Y-%m-%d %H'))]
     dat <- merge(dat,
                  dateDT,
@@ -54,7 +54,7 @@ ebQC <- function(dataList)
 {
   dupCountDict = sapply(dataList, function(dat) sum(duplicated(dat)))
   naPctDict = sapply(dataList, function(dat) round(100 * dat[, sum(is.na(use)) / .N], 2))
-  
+
   dat <- data.table(meterID = names(dataList),
                     dup_count = dupCountDict[names(dataList)],
                     na_pct = naPctDict[names(dataList)])
@@ -93,13 +93,14 @@ ebGetStation <-  function(x, y, start.date = NULL, end.date = NULL, include = NU
   if(!is.null(start.date)) out <- out[begin <= start.date]
   if(!is.null(end.date)) out <- out[end >= end.date]
   out[which.min(distance), station]
-  
+
 }
 
 #' Clean NOAA Temp Helper
 #' @import data.table
 #' @export
-translate_temp <- Vectorize(FUN = function(x){
+translate_temp <- Vectorize(FUN = function(x)
+{
   out <- regmatches(x, regexpr('\\d+', x, perl = TRUE))
   if(length(out) < 1) out <- NA
   out <- 0.1 * as.numeric(out) * (9 / 5) + 32
@@ -121,7 +122,7 @@ ebWeather = function(station, start_year, end_year = year(Sys.time()), time_zone
       fill = TRUE
     )
     dat = dat[, .(date = as.POSIXct(paste0(date, ' ', as.numeric(substr(time, 1, 2))),
-                                    tz = 'UTC', 
+                                    tz = 'UTC',
                                     format = '%Y%m%d %H'),
                   temperature = temperature,
                   temperature_quality = temperature_quality)]

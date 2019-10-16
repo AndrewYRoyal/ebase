@@ -4,8 +4,6 @@
 #' @export
 gboost <- function(dat, ...) UseMethod('gboost')
 
-mlr::getLearnerParamSet('regr.xgboost')
-
 #' Hourly Gradient Boost
 #' @import data.table
 #' @import mlr
@@ -14,6 +12,7 @@ gboost.hourly <- function(dat, model_options){
   configureMlr(on.error.dump = FALSE)
   dat <- copy(dat)
   blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
+  if(model_options$block_on_week) blockFactor <- factor(strftime(dat$date, '%U'))
   weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
   regTask <- makeRegrTask(id = 'reg',
                           data = dat[, (.SD), .SDcols = c('use', model_options$ivars)],
