@@ -51,4 +51,20 @@ predict.regress <- function(mod, dat, ...)
   dat[, .(meterID, date, period, use, pUse)]
 }
 
-
+#' Forecast Method
+#' @import data.table
+#' @export
+ebForecast.regress <- function(model, dat, ...)
+{
+  mod <- model$mod
+  dat <- copy(dat)
+  towDict <- get_towDict()
+  dat <- dat[, .(date = date,
+                 temp = temp,
+                 tow = factor(towDict[paste0(weekdays(date), hour(date))], levels = mod$xlevels$tow),
+                 mm = factor(month(date), levels = mod$xlevels$mm))]
+  get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,)\\d+', x, perl = TRUE)))
+  tcuts <- c(0, as.numeric(get_levels(mod$xlevels$tbin)))
+  dat[, tbin:= cut(temp, tcuts)]
+  dat[, .(date, temp, use = predict(mod, dat))]
+}

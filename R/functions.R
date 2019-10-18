@@ -70,16 +70,12 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   dat <- dat[period > 0 & period < 5, ]
   pNames <- c('pretrial', 'baseline', 'blackout', 'performance')
   dat[, period:= as.factor(pNames[period])]
-  dat[, tow:= .GRP, by = .(wday(date), hour(date))]
+  towDict <- get_towDict()
+  dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
-  tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
-
-  dat[, tbin:= as.factor(cut(temp, tcuts))]
-  qtemp = unname(c(0, quantile(dat$temp, 1:ntbin / ntbin))[1:(ntbin + 1)])
-  qtempList = lapply(1:ntbin, function(x) c(min = qtemp[x], max = qtemp[x + 1] - qtemp[x]))
-  dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q) pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max']))]
-
+  tcuts <- c(0, quantile(dat$temp, 1:ntbin / ntbin))
+  dat <- get_tbins(dat, tcuts)
   if(data_options$occupancy_lookup)
   {
     ocDT = ebOccupancy(dat[period == 'baseline', ])
@@ -343,5 +339,41 @@ strip_lm = function(x)
   attr(x$formula,".Environment") = c()
   x
 }
+
+#' Forecast Method
+#' @import data.table
+#' @export
+ebForecast <- function(model, ...) UseMethod('ebForecast')
+
+#' Temp Bins Helper Function
+#' @import data.table
+#' @export
+get_tbins <- function(dat, tcuts){
+  dat[, tbin:= as.factor(cut(temp, tcuts))]
+  ntbin <- length(tcuts) - 1
+  dat[, tbin:= as.factor(cut(temp, tcuts))]
+  #qtemp = unname(c(0, quantile(dat$temp, 1:ntbin / ntbin))[1:(ntbin + 1)])
+  #tcuts
+
+  qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
+  dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q){
+    pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max'])
+  })]
+  dat
+}
+
+#' TOW Dictionary Helper
+#' @import data.table
+#' @export
+get_towDict <- function()
+{
+  setNames(
+    1:168,
+    paste0(
+      rep(c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+          each =  24),
+      rep(0:23, 7)))
+}
+
 
 
