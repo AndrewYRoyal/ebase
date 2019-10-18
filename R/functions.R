@@ -352,9 +352,6 @@ get_tbins <- function(dat, tcuts){
   dat[, tbin:= as.factor(cut(temp, tcuts))]
   ntbin <- length(tcuts) - 1
   dat[, tbin:= as.factor(cut(temp, tcuts))]
-  #qtemp = unname(c(0, quantile(dat$temp, 1:ntbin / ntbin))[1:(ntbin + 1)])
-  #tcuts
-
   qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
   dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q){
     pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max'])

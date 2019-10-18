@@ -63,7 +63,7 @@ ebForecast.regress <- function(model, dat, ...)
                  temp = temp,
                  tow = factor(towDict[paste0(weekdays(date), hour(date))], levels = mod$xlevels$tow),
                  mm = factor(month(date), levels = mod$xlevels$mm))]
-  get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,)\\d+', x, perl = TRUE)))
+  get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,).+(?=])', x, perl = TRUE)))
   tcuts <- c(0, as.numeric(get_levels(mod$xlevels$tbin)))
   dat[, tbin:= cut(temp, tcuts)]
   dat[, .(date, temp, use = predict(mod, dat))]
