@@ -23,7 +23,6 @@ gboost.hourly <- function(dat, model_options){
     makeDiscreteParam('max_depth', values = model_options$max_depth),
     makeDiscreteParam('nrounds', values = model_options$nrounds),
     makeDiscreteParam('early_stopping_rounds', values = model_options$early_stopping_rounds),
-    makeDiscreteParam('objective', values = model_options$objective),
     makeDiscreteParam('eta', values = model_options$eta))
   ctrl <- makeTuneControlGrid()
   rSampleDesc <- makeResampleDesc('CV', iter = model_options$blocks)
