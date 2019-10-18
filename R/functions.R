@@ -74,7 +74,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
-  tcuts <- c(0, quantile(dat$temp, 1:ntbin / ntbin))
+  tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
   dat <- get_tbins(dat, tcuts)
   if(data_options$occupancy_lookup)
   {
@@ -349,9 +349,9 @@ ebForecast <- function(model, ...) UseMethod('ebForecast')
 #' @import data.table
 #' @export
 get_tbins <- function(dat, tcuts){
-  dat[, tbin:= as.factor(cut(temp, tcuts))]
   ntbin <- length(tcuts) - 1
   dat[, tbin:= as.factor(cut(temp, tcuts))]
+  tcuts[1] <- 0
   qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
   dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q){
     pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max'])
