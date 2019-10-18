@@ -62,7 +62,19 @@ ebForecast.regress <- function(model, dat, ...)
   dat <- dat[, .(date = date,
                  temp = temp,
                  tow = factor(towDict[paste0(weekdays(date), hour(date))], levels = mod$xlevels$tow),
-                 mm = factor(month(date), levels = mod$xlevels$mm))]
+                 mm = as.factor(month(date)))]
+  tryCatch(
+    {
+      mmLevels <- setNames(mod$xlevels$mm, mod$xlevels$mm)
+      msngLevels <- setdiff(unique(dat$mm), mmLevels); names(msngLevels) <- msngLevels
+      if(length(msngLevels) > 0){
+        lnnDict <- sapply(msngLevels, function(x){
+          as.character(mmLevels[which.min(abs(as.numeric(mmLevels) - as.numeric(x)))])
+        })
+        dat[mm %in% msngLevels, mm:= lnnDict[as.character(mm)]]
+      }
+    }, error = function(e) NA) # TODO: also appears in ebPredict-- make more modular
+
   get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,).+(?=])', x, perl = TRUE)))
   tcuts <- c(0, as.numeric(get_levels(mod$xlevels$tbin)))
   dat[, tbin:= cut(temp, tcuts)]
