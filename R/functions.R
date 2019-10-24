@@ -16,6 +16,7 @@ ebDataFormat <- function(
                    blackout = 0,
                    base_min = 0,
                    perf_min = 0,
+                   tbin_type = 'simple',
                    occupancy_lookup = FALSE)
   data_options <- c(defaults[setdiff(names(defaults), names(data_options))], data_options)
   if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
@@ -24,6 +25,7 @@ ebDataFormat <- function(
   if(length(setdiff(meterDict, names(install_dates))) > 0) stop(
     sprintf('No install date for %s \n', paste(setdiff(meterDict, names(install_dates)), sep = ', ')))
   no_tbin <- setdiff(meterDict, names(temp_bins))
+  data_options$tbin_type = match.arg(data_options$tbin_type, c('simple', 'detailed', 'none'))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
   applyCall <- quote(f(meterDict,  function(m){
@@ -75,9 +77,10 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
   tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
-  dat <- get_tbins(dat, tcuts)
-  if(data_options$occupancy_lookup)
-  {
+  if(data_options$tbin_type != 'none') {
+    dat <- get_tbins(dat, tcuts, data_options$tbin_type)
+  }
+  if(data_options$occupancy_lookup) {
     ocDT = ebOccupancy(dat[period == 'baseline', ])
     dat = merge(dat, ocDT, by = c('tow', 'month'))
   }
@@ -111,15 +114,17 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 
                          blocks = 2,
                          block_on_week = FALSE,
                          weights = NULL,
-                         custom_lm = NULL,
                          occupancy_lookup = FALSE,
-                         ivars = NULL)
+                         ivars = NULL,
+                         custom_lm = NULL)
   model_options <- c(model_defaults[setdiff(names(model_defaults), names(model_options))], model_options)
   modelCall <- quote(f(dat = dat, model_options = model_options))
   modelCall[[1]] <- as.name(method)
   cat('X')
   eval(modelCall)
 }
+
+
 
 #' Predictions
 #' @import data.table
@@ -320,6 +325,7 @@ ebPlot.data.table <- function(x, compress = TRUE)
     dyLegend(width = 400)
 }
 
+
 #' Reduce size of linear model
 #' @import data.table
 #' @export
@@ -348,14 +354,15 @@ ebForecast <- function(model, ...) UseMethod('ebForecast')
 #' Temp Bins Helper Function
 #' @import data.table
 #' @export
-get_tbins <- function(dat, tcuts){
+get_tbins <- function(dat, tcuts, tbin_type){
   ntbin <- length(tcuts) - 1
   dat[, tbin:= as.factor(cut(temp, tcuts))]
-  tcuts[1] <- 0
-  qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
-  dat[, paste0('tbin_', 1:ntbin):= lapply(qtempList, function(q){
-    pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max'])
-  })]
+  if(tbin_type == 'detailed'){
+    tcuts <- unname(c(0, tcuts[-1]))
+    qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
+    dat[, paste0('tbin_', 1:ntbin):=
+          lapply(qtempList, function(q) pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max']))]
+  }
   dat
 }
 
