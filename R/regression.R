@@ -76,7 +76,7 @@ ebForecast.regress <- function(model, dat, ...)
     }, error = function(e) NA) # TODO: also appears in ebPredict-- make more modular
 
   get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,).+(?=])', x, perl = TRUE)))
-  tcuts <- c(0, as.numeric(get_levels(mod$xlevels$tbin)))
+  tcuts <- c(-Inf, as.numeric(get_levels(mod$xlevels$tbin)))
   dat[, tbin:= cut(temp, tcuts)]
   dat[, .(date, temp, use = predict(mod, dat))]
 }
