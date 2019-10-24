@@ -4,7 +4,7 @@
 \alias{get_tbins}
 \title{Temp Bins Helper Function}
 \usage{
-get_tbins(dat, tcuts)
+get_tbins(dat, tcuts, tbin_type)
 }
 \description{
 Temp Bins Helper Function

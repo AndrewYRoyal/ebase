@@ -216,20 +216,6 @@ adjustedN <- function(x, n){
   n*(1 - corr)/(1 + corr)
 }
 
-#' Calculate Loadpath Distance Matrix
-#' @import TSclust
-#' @import data.table
-#' @export
-ebDissCalc <- function(dat, method = 'DTWARP')
-{
-  dat <- dcast(dat, yday(date) ~ hour(date), value.var = 'use')
-  dat <- na.omit(dat)
-  dayV <- dat$date
-  dat <- as.matrix(dat[, -c('date')])
-  rownames(dat) <- dayV
-  diss(dat, method)
-}
-
 #' Apply Outlier Weights
 #' @import data.table
 #' @export
