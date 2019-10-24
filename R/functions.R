@@ -76,7 +76,8 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
-  tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin), Inf)
+  tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
+  tcuts <- c(tcuts[-length(tcuts)], Inf)
   if(data_options$tbin_type != 'none') {
     dat <- get_tbins(dat, tcuts, data_options$tbin_type)
   }
@@ -358,7 +359,7 @@ get_tbins <- function(dat, tcuts, tbin_type){
   ntbin <- length(tcuts) - 1
   dat[, tbin:= as.factor(cut(temp, tcuts))]
   if(tbin_type == 'detailed'){
-    tcuts <- unname(c(0, tcuts[-c(1, length(tcuts))]))
+    tcuts <- unname(c(0, tcuts[-1]))
     qtempList = lapply(1:ntbin, function(x) c(min = tcuts[x], max = tcuts[x + 1] - tcuts[x]))
     dat[, paste0('tbin_', 1:ntbin):=
           lapply(qtempList, function(q) pmin(as.numeric(temp > q['min']) * (temp - q['min']), q['max']))]

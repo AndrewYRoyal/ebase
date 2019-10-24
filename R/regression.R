@@ -58,6 +58,7 @@ ebForecast.regress <- function(model, dat, ...)
 {
   mod <- model$mod
   dat <- copy(dat)
+
   towDict <- get_towDict()
   dat <- dat[, .(date = date,
                  temp = temp,
