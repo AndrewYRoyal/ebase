@@ -63,12 +63,19 @@ ebDataFormat <- function(
 #' @export
 ebMeterFormat <- function(dat, inDate, ntbin, data_options)
 {
+  sec_day = 60 * 60 * 24
   dat[, period:=
-        (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length + 30, units = 'days')) +
-        (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length, units = 'days')) +
-        (date >= min(inDate) - as.difftime(data_options$blackout / 2, units = 'days')) +
-        (date >= max(inDate) + as.difftime(data_options$blackout / 2, units = 'days')) +
-        (date >= max(inDate) + as.difftime(data_options$blackout / 2 + data_options$perf_length, units = 'days'))]
+        (date >= min(inDate) - (data_options$blackout / 2 + data_options$base_length + 30) * sec_day) +
+        (date >= min(inDate) - (data_options$blackout / 2 + data_options$base_length) * sec_day) +
+        (date >= min(inDate) - (data_options$blackout / 2) * sec_day) +
+        (date >= max(inDate) + (data_options$blackout / 2) * sec_day) +
+        (date >= max(inDate) + (data_options$blackout / 2 + data_options$perf_length) * sec_day)]
+  # dat[, period:=
+  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length + 30, units = 'days')) +
+  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length, units = 'days')) +
+  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2, units = 'days')) +
+  #       (date >= max(inDate) + as.difftime(data_options$blackout / 2, units = 'days')) +
+  #       (date >= max(inDate) + as.difftime(data_options$blackout / 2 + data_options$perf_length, units = 'days'))]
   dat <- dat[period > 0 & period < 5, ]
   pNames <- c('pretrial', 'baseline', 'blackout', 'performance')
   dat[, period:= as.factor(pNames[period])]
