@@ -4,7 +4,7 @@
 #' @export
 ebDataFormat <- function(
   x,
-  install_dates,
+  install_dates = NULL,
   sites = NULL,
   data_options = NULL,
   temp_bins = NULL,
@@ -22,8 +22,6 @@ ebDataFormat <- function(
   if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
   meterDict <- setNames(unique(x$meterID), unique(x$meterID))
   cat(length(meterDict), 'total meters \n')
-  if(length(setdiff(meterDict, names(install_dates))) > 0) stop(
-    sprintf('No install date for %s \n', paste(setdiff(meterDict, names(install_dates)), sep = ', ')))
   no_tbin <- setdiff(meterDict, names(temp_bins))
   data_options$tbin_type = match.arg(data_options$tbin_type, c('simple', 'detailed', 'none'))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
@@ -64,20 +62,16 @@ ebDataFormat <- function(
 ebMeterFormat <- function(dat, inDate, ntbin, data_options)
 {
   sec_day = 60 * 60 * 24
-  dat[, period:=
-        (date >= min(inDate) - (data_options$blackout / 2 + data_options$base_length + 30) * sec_day) +
-        (date >= min(inDate) - (data_options$blackout / 2 + data_options$base_length) * sec_day) +
-        (date >= min(inDate) - (data_options$blackout / 2) * sec_day) +
-        (date >= max(inDate) + (data_options$blackout / 2) * sec_day) +
-        (date >= max(inDate) + (data_options$blackout / 2 + data_options$perf_length) * sec_day)]
-  # dat[, period:=
-  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length + 30, units = 'days')) +
-  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2 + data_options$base_length, units = 'days')) +
-  #       (date >= min(inDate) - as.difftime(data_options$blackout / 2, units = 'days')) +
-  #       (date >= max(inDate) + as.difftime(data_options$blackout / 2, units = 'days')) +
-  #       (date >= max(inDate) + as.difftime(data_options$blackout / 2 + data_options$perf_length, units = 'days'))]
-  dat <- dat[period > 0 & period < 5, ]
-  pNames <- c('pretrial', 'baseline', 'blackout', 'performance')
+  dat[, period:= 1]
+  if(!is.null(inDate)) {
+    dat[, period:=
+          (date >= min(inDate) - (data_options$blackout / 2 + data_options$base_length) * sec_day) +
+          (date >= min(inDate) - (data_options$blackout / 2) * sec_day) +
+          (date >= max(inDate) + (data_options$blackout / 2) * sec_day) +
+          (date >= max(inDate) + (data_options$blackout / 2 + data_options$perf_length) * sec_day)]
+  }
+  dat <- dat[period > 0 & period < 4]
+  pNames <- c('baseline', 'blackout', 'performance')
   dat[, period:= as.factor(pNames[period])]
   towDict <- get_towDict()
   dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
@@ -89,7 +83,7 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
     dat <- get_tbins(dat, tcuts, data_options$tbin_type)
   }
   if(data_options$occupancy_lookup) {
-    ocDT = ebOccupancy(dat[period == 'baseline', ])
+    ocDT = ebOccupancy(dat[period == 'baseline'])
     dat = merge(dat, ocDT, by = c('tow', 'month'))
   }
   classStr <- list('hourly' = c('hourly'), 'daily' = c('daily', 'hourly'))[[data_options$interval]]
