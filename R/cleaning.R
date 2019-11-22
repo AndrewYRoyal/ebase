@@ -6,8 +6,8 @@ ebRawConvert <- function(dat, utility = 'sdge', id = c('account', 'meter'))
   id = match.arg(id)
   if(utility == 'sdge'){
     id <- c('account' = 'ACCT_NBR', 'meter' = 'ID_MTR')[id]
-    keep <- c('INTRVL_DATE', id, 'CHNL_ID', grep('KWH', names(useDT), value = TRUE))
-    dat <- useDT[, .SD, .SDcols = keep]
+    keep <- c('INTRVL_DATE', id, 'CHNL_ID', grep('KWH', names(dat), value = TRUE))
+    dat <- dat[, .SD, .SDcols = keep]
     setnames(dat, c(id, 'INTRVL_DATE', 'CHNL_ID'), c('meterID', 'day', 'channel'))
     numV <- setdiff(names(dat), c('meterID', 'day', 'channel'))
     dat[, (numV):= lapply(.SD, as.numeric), .SDcols = numV]
