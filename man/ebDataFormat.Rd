@@ -4,8 +4,8 @@
 \alias{ebDataFormat}
 \title{Data Format}
 \usage{
-ebDataFormat(x, install_dates, sites = NULL, data_options = NULL,
-  temp_bins = NULL, cpus = 1)
+ebDataFormat(x, install_dates = NULL, sites = NULL,
+  data_options = NULL, temp_bins = NULL, cpus = 1)
 }
 \description{
 Data Format
