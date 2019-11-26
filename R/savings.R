@@ -1,3 +1,6 @@
+#' Format Savings from Summary Object
+#' @import data.table
+#' @export
 ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
   dat = merge(
     x$Sites$savings[, .(site, Gross = Savings, gross_var = varSavings)],
@@ -19,12 +22,15 @@ ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
   out
 }
 
+#' Summarize ECM Savings
+#' @import data.table
+#' @export
 ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
   dat = merge(
     x$raw,
     site_dat[, .SD, .SDcols = c('site', measures)],
     by.x = 'id', by.y = 'site')
-  
+
   gross_frm = sprintf('Gross ~ %s  - 1', paste(measures_v, collapse = '+'))
   gross_model = summary(lm(gross_frm, data = dat))
   deemed_frm = sprintf('Deemed ~ %s  - 1', paste(measures_v, collapse = '+'))
@@ -44,23 +50,25 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
   out
 }
 
-ebPlot = function(x, ...) UseMethod('ebPlot')
+#' Plot Savings
+#' @import data.table
+#' @export
 ebPlot.savings = function(x, units = 'kWh') {
   dat = melt(x$raw[, -c('gross_var')], id.vars = 'id', value.name = 'use')
-  dat = merge(dat, 
+  dat = merge(dat,
               x$raw[, .(variable = 'Gross', id, gross_var)],
               by = c('id', 'variable'),
               all.x = TRUE)
   dat[, use:= use / 1e3]
   dat[, gross_var:= gross_var / 1e6]; dat[is.na(gross_var), gross_var:= 0]
   dat[, variable:= factor(variable, levels = c('Baseline', 'Deemed', 'Gross'))]
-  
+
   colors_v = c('Baseline' = 'black', 'Deemed' = 'gray', 'Gross' = 'lightgreen')
   labels_v = c('Baseline' = 'Baseline', 'Deemed Savings' = 'gray', 'Gross' = 'Gross Savings')
-  ggplot(data = dat, aes(x = variable, 
-                         y = use, 
+  ggplot(data = dat, aes(x = variable,
+                         y = use,
                          color = variable,
-                         fill = variable, 
+                         fill = variable,
                          ymin = use - 1.96 * sqrt(gross_var),
                          ymax = use + 1.96 * sqrt(gross_var))) +
     theme_minimal() +
@@ -68,9 +76,9 @@ ebPlot.savings = function(x, units = 'kWh') {
     theme(panel.grid = element_blank()) +
     geom_bar(stat = 'identity') +
     geom_errorbar(color = 'black', position = 'dodge', width = 0.5) +
-    scale_fill_manual('', values = colors_v, 
+    scale_fill_manual('', values = colors_v,
                       labels = labels_v) +
-    scale_color_manual('', values = colors_v, 
+    scale_color_manual('', values = colors_v,
                        labels = labels_v) +
     scale_x_discrete('') +
     scale_y_continuous(sprintf("%s ('000)", units)) +
