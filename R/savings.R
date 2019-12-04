@@ -7,10 +7,10 @@ ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
     x$sites$metrics[, .(site, Baseline = baseline)])
   dat[, Deemed:= deemed[site]]
   dat[, norm:= FALSE]
-  if(!is.null(sites_subset)) dat = dat[site %in% sites_subset]
   if(!is.null(x$sites$norm)) {
     dat = rbind(dat, x$sites$norms[, .(site, Gross = gross, var_gross, norm = TRUE)], fill = TRUE)
   }
+  if(!is.null(sites_subset)) dat = dat[site %in% sites_subset]
   cols = c('Gross', 'Baseline', 'Deemed', 'var_gross')
   dat = dat[, lapply(.SD, as.numeric), .SDcols = cols, by = .(id = site, norm)]
   if(!is.null(groups)) dat = dat[, lapply(.SD, sum), .SDcols = cols, by = .(id = groups[id])]
@@ -58,17 +58,20 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
 #' @import data.table
 #' @export
 ebPlot.savings = function(x, units = 'kWh') {
-  dat = melt(x$raw[, -c('var_gross')], id.vars = 'id', value.name = 'use')
+  dat = melt(x$raw[, -c('var_gross')], id.vars = c('id', 'norm'), value.name = 'use')
+  dat = na.omit(dat)
   dat = merge(dat,
-              x$raw[, .(variable = 'Gross', id, var_gross)],
-              by = c('id', 'variable'),
+              x$raw[, .(variable = 'Gross', id, var_gross, norm)],
+              by = c('id', 'variable', 'norm'),
               all.x = TRUE)
+  dat[(norm), variable:= 'Norm']
   dat[, use:= use / 1e3]
   dat[, var_gross:= var_gross / 1e6]; dat[is.na(var_gross), var_gross:= 0]
-  dat[, variable:= factor(variable, levels = c('Baseline', 'Deemed', 'Gross'))]
+  dat[, variable:= factor(variable, levels = c('Baseline', 'Deemed', 'Gross', 'Norm'))]
 
-  colors_v = c('Baseline' = 'black', 'Deemed' = 'gray', 'Gross' = 'lightgreen')
-  labels_v = c('Baseline' = 'Baseline', 'Deemed Savings' = 'gray', 'Gross' = 'Gross Savings')
+  colors_v = c('Baseline' = 'black', 'Deemed' = 'gray', 'Gross' = 'lightgreen', 'Norm' = 'royalblue')
+  labels_v = c('Baseline' = 'Baseline', 'Deemed Savings' = 'gray', 'Gross' = 'Gross Savings',
+               'Norm' = 'WN Savings')
   ggplot(data = dat, aes(x = variable,
                          y = use,
                          color = variable,
