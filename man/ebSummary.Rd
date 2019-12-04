@@ -2,10 +2,10 @@
 % Please edit documentation in R/functions.R
 \name{ebSummary}
 \alias{ebSummary}
-\title{Prediction and Savings Summary}
+\title{Summarize Prediction Data}
 \usage{
-ebSummary(predictions, siteDict = NULL)
+ebSummary(x, ...)
 }
 \description{
-Prediction and Savings Summary
+Summarize Prediction Data
 }

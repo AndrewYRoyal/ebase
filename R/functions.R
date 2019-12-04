@@ -8,8 +8,7 @@ ebDataFormat <- function(
   sites = NULL,
   data_options = NULL,
   temp_bins = NULL,
-  cpus = 1)
-{
+  cpus = 1) {
   defaults <- list(interval = 'hourly',
                    base_length = 365,
                    perf_length = 365,
@@ -21,12 +20,13 @@ ebDataFormat <- function(
   data_options <- c(defaults[setdiff(names(defaults), names(data_options))], data_options)
   if(!(data_options$interval %in% c('hourly', 'daily'))) stop('Improper interval')
   meterDict <- setNames(unique(x$meterID), unique(x$meterID))
+  if(is.null(sites)) sites <- meterDict
   cat(length(meterDict), 'total meters \n')
   no_tbin <- setdiff(meterDict, names(temp_bins))
   data_options$tbin_type = match.arg(data_options$tbin_type, c('simple', 'detailed', 'none'))
   temp_bins <- c(setNames(rep(10, length(no_tbin)), no_tbin), temp_bins)
 
-  applyCall <- quote(f(meterDict,  function(m){
+  applyCall <- quote(f(meterDict,  function(m) {
     ebMeterFormat(dat = x[meterID == m, ],
                   inDate = install_dates[[m]],
                   ntbin = temp_bins[m],
@@ -41,26 +41,59 @@ ebDataFormat <- function(
   dataList <- eval(applyCall)
   if(cpus > 1) parallelStop(); dataList <- setNames(dataList, meterDict)
 
-  meterDict <- meterDict[sapply(meterDict, function(meter) dataList[[meter]][['model']])]
+  dataList <- dataList[sapply(dataList, function(x) !is.null(names(x)))]
+  meterDict = setNames(names(dataList), names(dataList))
   cat(length(meterDict), 'with sufficient data \n')
   sites <- sites[names(sites) %in% meterDict]
-
-  out <- list(
-    pretrial = lapply(meterDict, function(meter) dataList[[meter]][['pretrial']]),
-    baseline = lapply(meterDict, function(meter) dataList[[meter]][['baseline']]),
-    blackout = lapply(meterDict, function(meter) dataList[[meter]][['blackout']]),
-    performance = lapply(meterDict, function(meter) dataList[[meter]][['performance']]),
+  norms = NULL
+  if('norm' %in% names(x)) {
+    cat('Detected weather normals in data. \n')
+    norms = lapply(dataList, function(x) x$performance[, .(meterID, date, temp = norm)])
+  }
+  periods = names(dataList[[1]])
+  names(periods) = periods
+  list(
+    stack = function(level = 'period') dstack(dataList, periods, level),
+    list = function(level = 'period') dlist(dataList, periods, level),
+    norms = norms,
     meterDict = meterDict,
     siteDict = sites,
-    tcuts = lapply(meterDict, function(meter) dataList[[meter]][['tcuts']]))
-  out
+    periods = periods)
+
+}
+
+#' Data Stack Method
+#' @import data.table
+#' @export
+dstack = function(dataList, periods, level) {
+  if(level == 'meter') {
+    lapply(dataList, rbindlist)
+  } else if(level == 'period') {
+    lapply(periods, function(period) {
+      meterDict = setNames(names(dataList), names(dataList))
+      rbindlist(lapply(meterDict, function(meter) dataList[[meter]][[period]]))
+    })
+  }
+}
+
+#' Data List Method
+#' @import data.table
+#' @export
+dlist = function(dataList, periods, level) {
+  if(level == 'meter') {
+    dataList
+  } else if(level == 'period') {
+    meterDict = setNames(names(dataList), names(dataList))
+    lapply(periods, function(period) {
+      lapply(meterDict, function(meter) dataList[[meter]][[period]])
+    })
+  }
 }
 
 #' Meter Format
 #' @import data.table
 #' @export
-ebMeterFormat <- function(dat, inDate, ntbin, data_options)
-{
+ebMeterFormat <- function(dat, inDate, ntbin, data_options) {
   sec_day = 60 * 60 * 24
   dat[, period:= 1]
   if(!is.null(inDate)) {
@@ -89,15 +122,11 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options)
   classStr <- list('hourly' = c('hourly'), 'daily' = c('daily', 'hourly'))[[data_options$interval]]
   setattr(dat, "class", c(classStr, class(dat)))
 
-  out <- list(
-    pretrial = dat[period == 'pretrial', ],
-    baseline = dat[period == 'baseline', ],
-    blackout = dat[period == 'blackout', ],
-    performance = dat[period == 'performance', ],
-    model = uniqueN(dat[period == 'baseline', as.Date(date)]) >= data_options$base_min &
-      uniqueN(dat[period == 'performance', as.Date(date)]) >= data_options$perf_min,
-    tcuts = tcuts
-  )
+  if(uniqueN(dat[period == 'baseline', as.Date(date)]) < data_options$base_min |
+     uniqueN(dat[period == 'performance', as.Date(date)]) < data_options$perf_min) return(NA)
+  list(baseline = dat[period == 'baseline', ],
+       blackout = dat[period == 'blackout', ],
+       performance = dat[period == 'performance', ])
 }
 
 #' Baseline Model
@@ -132,56 +161,101 @@ ebModel <- function(dat, method = c('regress', 'gboost', 'rforest', 'caltrack', 
 #' @import data.table
 #' @import mlr
 #' @export
-ebPredict <- function(modelList,
-                      dataList,
-                      periods = c('pretrial', 'baseline', 'blackout', 'performance'))
-{
-
-  out <- lapply(dataList$meterDict, function(meter){
-    rbindlist(
-      lapply(periods,
-             function(period) predict(mod = modelList[[meter]],
-                                      dat = dataList[[period]][[meter]])),
-      fill = TRUE)[, .(meterID, date, period, use, pUse)]
-  })
+ebPredict = function(modelList, dataList) {
+  meterDict = dataList$meterDict
+  siteDict = dataList$siteDict
+  periods = dataList$periods
+  norms = dataList$norms
+  dataList = dataList$stack('meter')
+  dataList = lapply(meterDict, function(meter) predict(modelList[[meter]], dataList[[meter]]))
+  dataList = lapply(dataList, split, by = 'period')
+  norm_predict = NULL
+  if(!is.null(norms)) {
+    norm_dat = lapply(meterDict, function(meter) ebForecast(modelList[[meter]], norms[[meter]]))
+    norm_predict = function(modelList) {
+      lapply(meterDict, function(meter) {
+        merge(ebForecast(modelList[[meter]], norms[[meter]])[, .(meterID = meter, date, use)],
+              norm_dat[[meter]][, .(date, pUse = use)])
+      })
+    }
+  }
+  out = list(
+    stack = function(level = 'period') dstack(dataList, periods, level),
+    list = function(level = 'period') dlist(dataList, periods, level),
+    site_dat = data.table(site = as.factor(siteDict), meterID = names(siteDict)),
+    norm_predict = norm_predict)
+  setattr(out, 'class', c('prediction', class(out)))
   out
 }
+
+#' Summarize Prediction Data
+#' @import data.table
+#' @export
+ebSummary <- function(x, ...) UseMethod('ebSummary')
+
 
 #' Prediction and Savings Summary
 #' @import data.table
 #' @export
-ebSummary <- function(predictions, siteDict = NULL){
-
-  dat <- rbindlist(predictions)
-  meter_metrics <- dat[period == 'baseline',
-                       list(R2 = R2(use, pUse),
-                            CVRMSE = CVRMSE(use, pUse),
-                            NMBE = NMBE(use, pUse),
-                            Annual = sum(use)),
-                       by = .(meterID)]
-  meter_savings <- dat[period == 'performance',
-                       list(Savings = sum(pUse - use),
-                            varSavings = varCalc(use, pUse)),
-                       by = .(meterID)]
-
-  site_metrics <- NULL; site_savings <- NULL
-  if(!is.null(siteDict))
-  {
-    site_metrics <- dat[period == 'baseline',
-                        list(R2 = R2(use, pUse),
-                             CVRMSE = CVRMSE(use, pUse),
-                             NMBE = NMBE(use, pUse),
-                             Annual = sum(use)),
-                        by = .(site = as.character(siteDict[meterID]))]
-    site_savings = meter_savings[, lapply(.SD, sum),
-                                 .SDcols = c('Savings', 'varSavings'),
-                                 by = .(site = as.character(siteDict[meterID]))]
+ebSummary.prediction = function(x, norm_modelList = NULL) {
+  meter_baseline = merge(x$site_dat,
+                         x$stack()[['baseline']],
+                         by = 'meterID')
+  site_baseline = meter_baseline[, lapply(.SD, sum),
+                                 by = .(site, date),
+                                 .SDcols = c('use', 'pUse')]
+  meter_perf = merge(x$site_dat,
+                     x$stack()[['performance']])
+  site_perf = meter_perf[, lapply(.SD, sum),
+                         by = .(site, date),
+                         .SDcols = c('use', 'pUse')]
+  meter_metrics <- meter_baseline[, list(r2 = R2(use, pUse),
+                                         cvrmse = CVRMSE(use, pUse),
+                                         nmbe = NMBE(use, pUse),
+                                         baseline = sum(use)),
+                                  by = .(meterID)]
+  meter_savings <- meter_perf[, list(gross = sum(pUse - use),
+                                     var_gross = varCalc(use, pUse)),
+                              by = .(meterID)]
+  site_metrics <- site_baseline[, list(r2 = R2(use, pUse),
+                                        cvrmse = CVRMSE(use, pUse),
+                                        nmbe = NMBE(use, pUse),
+                                        baseline = sum(use)),
+                                 by = .(site)]
+  site_savings <- site_perf[, list(gross = sum(pUse - use),
+                                   var_gross = varCalc(use, pUse)),
+                            by = .(site)]
+  norms = list(meters = NULL, sites = NULL)
+  if(!is.null(norm_modelList)) {
+    norm_dat = rbindlist(x$norm_predict(norm_modelList))
+    norm_dat = merge(x$site_dat, norm_dat)
+    setattr(norm_dat, 'class', c('norm', class(norm_dat)))
+    norms = ebSummary(norm_dat)
   }
+  return(list(meters = list(metrics = meter_metrics,
+                            savings = meter_savings,
+                            norms = norms$meters),
+              sites = list(metrics = site_metrics,
+                           savings = site_savings,
+                           norms = norms$sites)))
+}
 
-  return(list(Meters = list(metrics = meter_metrics,
-                            savings = meter_savings),
-              Sites = list(metrics = site_metrics,
-                           savings = site_savings)))
+#' Normalized Savings Summary
+#' @import data.table
+#' @export
+ebSummary.norm = function(x) {
+  meter_perf = x
+  site_perf = meter_perf[, lapply(.SD, sum),
+                         by = .(site, date),
+                         .SDcols = c('use', 'pUse')]
+  meter_savings <- meter_perf[, list(gross = sum(pUse - use),
+                                     var_gross = varCalc(use, pUse)),
+                              by = .(meterID)]
+  site_savings <- site_perf[, list(gross = sum(pUse - use),
+                                   var_gross = varCalc(use, pUse)),
+                            by = .(site)]
+  list(meters = meter_savings,
+       sites = site_savings)
 }
 
 #' R2 calculation
@@ -233,7 +307,6 @@ ebOutlierWeights <- function(dat)
   dat[, weight:= wt(z)]
   dat[, z:= NULL]
 }
-
 
 #' Add Event
 #' @import data.table
@@ -291,8 +364,7 @@ ebPlot <- function(x, ...) UseMethod('ebPlot')
 #' @import data.table
 #' @import dygraphs
 #' @export
-ebPlot.data.table <- function(x, compress = TRUE)
-{
+ebPlot.data.table <- function(x, compress = TRUE) {
   dat <- copy(x)
   setnames(dat, c('use', 'pUse'), c('Actual', 'Predicted'))
   datesV <- c(
@@ -309,7 +381,6 @@ ebPlot.data.table <- function(x, compress = TRUE)
     dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%
     dyEvent(datesV[2]) %>%
     dyEvent(datesV[3], 'Install Period', labelLoc = "top") %>%
-    dyEvent(datesV[1], 'Pre-Trial', labelLoc = "top") %>%
     dyLegend(width = 400)
 }
 

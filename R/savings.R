@@ -3,12 +3,16 @@
 #' @export
 ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
   dat = merge(
-    x$Sites$savings[, .(site, Gross = Savings, gross_var = varSavings)],
-    x$Sites$metrics[, .(site, Baseline = Annual)])
+    x$sites$savings[, .(site, Gross = gross, var_gross)],
+    x$sites$metrics[, .(site, Baseline = baseline)])
   dat[, Deemed:= deemed[site]]
+  dat[, norm:= FALSE]
   if(!is.null(sites_subset)) dat = dat[site %in% sites_subset]
-  cols = c('Gross', 'Baseline', 'Deemed', 'gross_var')
-  dat = dat[, lapply(.SD, as.numeric), .SDcols = cols, by = .(id = site)]
+  if(!is.null(x$sites$norm)) {
+    dat = rbind(dat, x$sites$norms[, .(site, Gross = gross, var_gross, norm = TRUE)], fill = TRUE)
+  }
+  cols = c('Gross', 'Baseline', 'Deemed', 'var_gross')
+  dat = dat[, lapply(.SD, as.numeric), .SDcols = cols, by = .(id = site, norm)]
   if(!is.null(groups)) dat = dat[, lapply(.SD, sum), .SDcols = cols, by = .(id = groups[id])]
   formatted = dat[, .(id = id,
                       Baseline = format(round(Baseline), big.mark = ','),
@@ -39,7 +43,7 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
   dat = data.table(id = measures,
                    Gross = gross_model$coefficients[measures, 1],
                    Deemed = deemed_model$coefficients[measures, 1],
-                   gross_var = gross_model$coefficients[measures, 2] ^2)
+                   var_gross = gross_model$coefficients[measures, 2] ^2)
   formatted = dat[, .(id = id,
                       Deemed = format(round(Deemed), big.mark = ','),
                       Gross = format(round(Gross), big.mark = ','),
@@ -54,13 +58,13 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
 #' @import data.table
 #' @export
 ebPlot.savings = function(x, units = 'kWh') {
-  dat = melt(x$raw[, -c('gross_var')], id.vars = 'id', value.name = 'use')
+  dat = melt(x$raw[, -c('var_gross')], id.vars = 'id', value.name = 'use')
   dat = merge(dat,
-              x$raw[, .(variable = 'Gross', id, gross_var)],
+              x$raw[, .(variable = 'Gross', id, var_gross)],
               by = c('id', 'variable'),
               all.x = TRUE)
   dat[, use:= use / 1e3]
-  dat[, gross_var:= gross_var / 1e6]; dat[is.na(gross_var), gross_var:= 0]
+  dat[, var_gross:= var_gross / 1e6]; dat[is.na(var_gross), var_gross:= 0]
   dat[, variable:= factor(variable, levels = c('Baseline', 'Deemed', 'Gross'))]
 
   colors_v = c('Baseline' = 'black', 'Deemed' = 'gray', 'Gross' = 'lightgreen')
@@ -69,8 +73,8 @@ ebPlot.savings = function(x, units = 'kWh') {
                          y = use,
                          color = variable,
                          fill = variable,
-                         ymin = use - 1.96 * sqrt(gross_var),
-                         ymax = use + 1.96 * sqrt(gross_var))) +
+                         ymin = use - 1.96 * sqrt(var_gross),
+                         ymax = use + 1.96 * sqrt(var_gross))) +
     theme_minimal() +
     theme(legend.position = 'top') +
     theme(panel.grid = element_blank()) +

@@ -6,8 +6,7 @@ regress <- function(dat, ...) UseMethod('regress')
 #' Hourly Regression
 #' @import data.table
 #' @export
-regress.hourly <- function(dat, model_options, ...)
-{
+regress.hourly <- function(dat, model_options, ...) {
   dat <- copy(dat)
   if(is.null(model_options$weights)) dat[, obs_weights:= 1] else setnames(dat, model_options$weights, 'obs_weights')
   reg_formula <- quote(use ~ tow + tbin + mm - 1)
@@ -48,17 +47,16 @@ predict.regress <- function(mod, dat, ...)
 
   dat[, tow:= as.factor(tow)]
   dat[, pUse:= predict(mod$mod, dat)]
+  setattr(dat, name = 'class', value = c('hourly_predict', class(dat)))
   dat[, .(meterID, date, period, use, pUse)]
 }
 
 #' Forecast Method
 #' @import data.table
 #' @export
-ebForecast.regress <- function(model, dat, ...)
-{
+ebForecast.regress <- function(model, dat, ...) {
   mod <- model$mod
   dat <- copy(dat)
-
   towDict <- get_towDict()
   dat <- dat[, .(date = date,
                  temp = temp,
@@ -75,7 +73,6 @@ ebForecast.regress <- function(model, dat, ...)
         dat[mm %in% msngLevels, mm:= lnnDict[as.character(mm)]]
       }
     }, error = function(e) NA) # TODO: also appears in ebPredict-- make more modular
-
   get_levels <- Vectorize(FUN = function(x) regmatches(x, regexpr('(?<=,).+(?=])', x, perl = TRUE)))
   tcuts <- c(-Inf, as.numeric(get_levels(mod$xlevels$tbin)))
   dat[, tbin:= cut(temp, tcuts)]
