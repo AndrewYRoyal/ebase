@@ -5,7 +5,7 @@ ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
   dat = merge(
     x$sites$savings[, .(site, Gross = gross, var_gross)],
     x$sites$metrics[, .(site, Baseline = baseline)])
-  dat[, Deemed:= deemed[site]]
+  dat[, Deemed:= deemed[as.character(site)]]
   dat[, norm:= FALSE]
   if(!is.null(x$sites$norm)) {
     dat = rbind(dat, x$sites$norms[, .(site, Gross = gross, var_gross, norm = TRUE)], fill = TRUE)
@@ -35,12 +35,13 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
     site_dat[, .SD, .SDcols = c('site', measures)],
     by.x = 'id', by.y = 'site')
 
-  gross_frm = sprintf('Gross ~ %s  - 1', paste(measures_v, collapse = '+'))
+  gross_frm = sprintf('Gross ~ %s  - 1', paste(measures, collapse = '+'))
   gross_model = summary(lm(gross_frm, data = dat))
-  deemed_frm = sprintf('Deemed ~ %s  - 1', paste(measures_v, collapse = '+'))
+  deemed_frm = sprintf('Deemed ~ %s  - 1', paste(measures, collapse = '+'))
   deemed_model = summary(lm(deemed_frm, data = dat))
   if(!is.null(reporting_subset)) measures = reporting_subset
   dat = data.table(id = measures,
+                   norm = FALSE,
                    Gross = gross_model$coefficients[measures, 1],
                    Deemed = deemed_model$coefficients[measures, 1],
                    var_gross = gross_model$coefficients[measures, 2] ^2)
