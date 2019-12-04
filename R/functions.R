@@ -6,6 +6,7 @@ ebDataFormat <- function(
   x,
   install_dates = NULL,
   sites = NULL,
+  norm_data = NULL,
   data_options = NULL,
   temp_bins = NULL,
   cpus = 1) {
@@ -45,17 +46,12 @@ ebDataFormat <- function(
   meterDict = setNames(names(dataList), names(dataList))
   cat(length(meterDict), 'with sufficient data \n')
   sites <- sites[names(sites) %in% meterDict]
-  norms = NULL
-  if('norm' %in% names(x)) {
-    cat('Detected weather normals in data. \n')
-    norms = lapply(dataList, function(x) x$performance[, .(meterID, date, temp = norm)])
-  }
   periods = names(dataList[[1]])
   names(periods) = periods
   list(
     stack = function(level = 'period') dstack(dataList, periods, level),
     list = function(level = 'period') dlist(dataList, periods, level),
-    norms = norms,
+    norms = norm_data,
     meterDict = meterDict,
     siteDict = sites,
     periods = periods)
