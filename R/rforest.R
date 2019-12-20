@@ -9,6 +9,7 @@ rforest <- function(dat, ...) UseMethod('rforest')
 #' @import mlr
 #' @export
 rforest.hourly <- function(dat, ivars, model_options){
+  configureMlr(on.error.dump = FALSE)
   dat <- copy(as.data.table(dat))
   blockFactor <- factor(sort(rep(1:model_options$blocks, length(dat$date))[1:length(dat$date)]))
   weightsV <- tryCatch(dat[[model_options$weights]], error = function(e) NULL)
@@ -28,9 +29,12 @@ rforest.hourly <- function(dat, ivars, model_options){
     par.set = paramSpace,
     control = ctrl,
     show.info = FALSE)
+
   xgbLearn <- setHyperPars(
     makeLearner('regr.randomForest'),
     par.vals = tuner$x)
-  xgbModel <- train(learner = xgbLearn, ivars = model_options$ivars, task = regTask)
-  structure(list(mod = xgbModel), class = c('rforest', 'gboost'))
+  xgbModel <- train(learner = xgbLearn, task = regTask)
+  structure(
+    list(mod = xgbModel, model_type = 'rforest', ivars = model_options$ivars, weighted = !is.null(model_options$weights)),
+    class = c('rforest', 'gboost'))
 }
