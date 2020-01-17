@@ -37,7 +37,7 @@ ebRawConvert <- function(dat, utility = 'sdge', id = c('account', 'meter'))
 #' Fill Gaps in Date-range of Table
 #' @import data.table
 #' @export
-ebGapFill <- function(dat, interval = c('hour', 'day',) id_var = 'meterID')
+ebGapFill <- function(dat, interval = c('hour', 'day',), id_var = 'meterID')
 {
   interval = match.arg(interval)
   dat <- unique(na.omit(dat))
