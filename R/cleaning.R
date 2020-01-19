@@ -41,12 +41,16 @@ ebGapFill <- function(dat, interval = c('hour', 'day'), id_var = 'meterID')
 {
   interval = match.arg(interval)
   dat <- unique(na.omit(dat))
-  merge(
-    dat,
-    data.table(id = unique(dat[[id_var]]),
-               date = seq.POSIXt(from = min(dat$date), to = max(dat$date), by = interval)),
-    all.y = TRUE,
-    by.x = c('date', id_var), by.y = c('date', 'id'))
+  date_dat = rbindlist(
+    lapply(unique(dat[[id_var]]), function(i){
+      data.table(id = i,
+                 date = seq.POSIXt(from = min(dat$date), to = max(dat$date), by = interval))
+    })
+  )
+  merge(dat, date_dat,
+        all.y = TRUE,
+        by.x = c("date", id_var),
+        by.y = c("date", "id"))
 }
 
 #' QC Check on Use Data
