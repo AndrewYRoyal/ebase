@@ -75,9 +75,10 @@ ebQC <- function(dataList)
 #' QC Check on Use Data
 #' @import data.table
 #' @export
-ebImpute <- function(dat, value = 'use', method = c('hour', 'day'), indicator = FALSE)
+ebImpute <- function(dat, value = 'use', interval = c('hour', 'day'), indicator = FALSE)
 {
-  if(method == 'hour') {
+  interval = match.arg(interval)
+  if(interval == 'hour') {
     dat[, imputed:= mean(get(value), na.rm = TRUE),
         by = .(month(date), hour(date))]
   } else{
