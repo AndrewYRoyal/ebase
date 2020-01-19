@@ -47,10 +47,12 @@ ebGapFill <- function(dat, interval = c('hour', 'day'), id_var = 'meterID')
                  date = seq.POSIXt(from = min(dat$date), to = max(dat$date), by = interval))
     })
   )
-  merge(dat, date_dat,
-        all.y = TRUE,
-        by.x = c("date", id_var),
-        by.y = c("date", "id"))
+  out = merge(dat, date_dat,
+              all.y = TRUE,
+              by.x = c("date", id_var),
+              by.y = c("date", "id"))
+  if('site' %in% names(dat)) out[, site:= unique(dat$site)[1]]
+  out
 }
 
 #' QC Check on Use Data
@@ -73,11 +75,21 @@ ebQC <- function(dataList)
 #' QC Check on Use Data
 #' @import data.table
 #' @export
-ebImpute <- function(dat, value = 'use', method = c('hour_month'))
+ebImpute <- function(dat, value = 'use', method = c('hour', 'day'), indicator = FALSE)
 {
-  if(method == 'hour_month') dat[, imputed:= mean(get(value), na.rm = TRUE),
-                                 by = .(month(date), hour(date))]
-  dat[is.na(get(value)), (value):= imputed]; dat[, imputed:= NULL]
+  if(method == 'hour') {
+    dat[, imputed:= mean(get(value), na.rm = TRUE),
+        by = .(month(date), hour(date))]
+  } else{
+    dat[, imputed:= mean(get(value), na.rm = TRUE),
+        by = .(month(date), day(date))]
+  }
+  overall_mean = mean(dat[[value]], na.rm = TRUE)
+  dat[is.na(imputed), imputed:= overall_mean]
+
+  if(indicator) dat[, imp:= as.numeric(is.na(get(value)))]
+  dat[is.na(get(value)), (value):= imputed]
+  dat[, imputed:= NULL]
   dat
 }
 
