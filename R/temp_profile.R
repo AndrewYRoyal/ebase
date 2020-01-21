@@ -58,8 +58,7 @@ ebTempProf = function(dat, balance_points = NULL, dm_vars = NULL)
 #' @import data.table
 #' @import ggplot2
 #' @export
-ebPlot.tprofile = function(x, data_only = FALSE)
-{
+ebPlot.tprofile = function(x, data_only = FALSE, outcome = 'kWh') {
   temp_range = seq(round(min(x$dat$temp)), round(max(x$dat$temp)), by = 0.1)
   dat = data.table(
     temp = temp_range,
@@ -68,16 +67,17 @@ ebPlot.tprofile = function(x, data_only = FALSE)
   dat[, use:= predict(x$model, dat, type = 'response')]
   if(data_only) return(list(curve = dat[, .(temp, use, mtype = x$mtype)], points = x$dat))
   ggplot(data = dat, aes(x = temp, y = use)) +
-    theme_light(base_size = 14) +
+    theme_classic(base_size = 18) +
     geom_point(data = x$dat, aes(x = temp, y = use)) +
     scale_x_continuous('Outside Temperature') +
-    scale_y_continuous('kWh') +
+    scale_y_continuous(outcome) +
     geom_line(size = 1.5,
               color = c('Cooling' = 'royalblue',
                         'Heating' = 'red',
                         'Heating and Cooling' = 'darkorange',
                         'Baseload Only' = 'black')[x$mtype])
 }
+
 
 #' Facet Plot Hourly Temperature Profile
 #' @import data.table
