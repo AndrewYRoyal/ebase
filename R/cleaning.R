@@ -45,7 +45,10 @@ ebGapFill <- function(dat, interval = c("hour", "day"), id_var = "meterID") {
     lapply(unique(dat[[id_var]]), function(i) {
       data.table(id = i, date = date_range)
     }))
-  merge(dat, date_dat, all.y = TRUE, by.x = c("date", id_var), by.y = c("date", "id"))
+  out = merge(dat, date_dat, all.y = TRUE, by.x = c("date", id_var),
+              by.y = c("date", "id"))
+  if('site' %in% names(out)) out[, site:= max(site, na.rm = TRUE), by = id_var]
+  out
 }
 
 #' QC Check on Use Data
