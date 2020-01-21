@@ -121,3 +121,17 @@ ebHourlyTempFacet <- function(dat, hours = c(0:11 * 2))
     facet_wrap(~hour)
 }
 
+#' Predict site-year heating and cooling load
+#' @import data.table
+#' @export
+predict.tprofile = function(x, dat) {
+  min_use = min(dat$use)
+  dat = dat[, .(site, date, hd = pmax(model$bh - temp, 0), cd = pmax(temp - model$bc, 0))]
+  dat[, p_use:= predict(model$model, dat)]
+
+  cooling = dat[cd > 0, .(cooling = sum(p_use - min_use)), by = .(site, year(date))]
+  heating = dat[hd > 0, .(heating = sum(p_use - min_use)), by = .(site, year(date))]
+
+  merge(cooling, heating, by = c('site', 'year'))
+}
+

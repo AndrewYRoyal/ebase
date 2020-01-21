@@ -4,7 +4,7 @@
 \alias{ebGapFill}
 \title{Fill Gaps in Date-range of Table}
 \usage{
-ebGapFill(dat, id_var = "meterID")
+ebGapFill(dat, interval = c("hour", "day"), id_var = "meterID")
 }
 \description{
 Fill Gaps in Date-range of Table

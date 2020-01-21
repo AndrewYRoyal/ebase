@@ -4,7 +4,8 @@
 \alias{ebImpute}
 \title{QC Check on Use Data}
 \usage{
-ebImpute(dat, value = "use", method = c("hour_month"))
+ebImpute(dat, value = "use", interval = c("hour", "day"),
+  indicator = FALSE)
 }
 \description{
 QC Check on Use Data

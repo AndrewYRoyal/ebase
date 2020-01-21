@@ -37,22 +37,15 @@ ebRawConvert <- function(dat, utility = 'sdge', id = c('account', 'meter'))
 #' Fill Gaps in Date-range of Table
 #' @import data.table
 #' @export
-ebGapFill <- function(dat, interval = c('hour', 'day'), id_var = 'meterID')
-{
+ebGapFill <- function(dat, interval = c("hour", "day"), id_var = "meterID") {
   interval = match.arg(interval)
   dat <- unique(na.omit(dat))
+  date_range = seq.POSIXt(from = min(dat$date), to = max(dat$date), by = interval)
   date_dat = rbindlist(
-    lapply(unique(dat[[id_var]]), function(i){
-      data.table(id = i,
-                 date = seq.POSIXt(from = min(dat$date), to = max(dat$date), by = interval))
-    })
-  )
-  out = merge(dat, date_dat,
-              all.y = TRUE,
-              by.x = c("date", id_var),
-              by.y = c("date", "id"))
-  if('site' %in% names(dat)) out[, site:= unique(dat$site)[1]]
-  out
+    lapply(unique(dat[[id_var]]), function(i) {
+      data.table(id = i, date = date_range)
+    }))
+  merge(dat, date_dat, all.y = TRUE, by.x = c("date", id_var), by.y = c("date", "id"))
 }
 
 #' QC Check on Use Data
@@ -81,9 +74,6 @@ ebImpute <- function(dat, value = 'use', interval = c('hour', 'day'), indicator 
   if(interval == 'hour') {
     dat[, imputed:= mean(get(value), na.rm = TRUE),
         by = .(month(date), hour(date))]
-  } else{
-    dat[, imputed:= mean(get(value), na.rm = TRUE),
-        by = .(month(date), day(date))]
   }
   overall_mean = mean(dat[[value]], na.rm = TRUE)
   dat[is.na(imputed), imputed:= overall_mean]
