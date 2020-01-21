@@ -124,6 +124,7 @@ ebHourlyTempFacet <- function(dat, hours = c(0:11 * 2))
 #' Predict site-year heating and cooling load
 #' @import data.table
 #' @export
+
 predict.tprofile = function(x, dat) {
   min_use = min(x$dat$use)
   dat = dat[, .(site, date, hd = pmax(x$bh - temp, 0), cd = pmax(temp - x$bc, 0))]
@@ -132,6 +133,14 @@ predict.tprofile = function(x, dat) {
   cooling = dat[cd > 0, .(cooling = sum(p_use - min_use)), by = .(site, year(date))]
   heating = dat[hd > 0, .(heating = sum(p_use - min_use)), by = .(site, year(date))]
 
-  merge(cooling, heating, by = c('site', 'year'))
+  if(x$mtype == 'Heating and Cooling') {
+    return(merge(cooling, heating, by = c('site', 'year')))
+  } else if(x$mtype == 'Cooling'){
+    return(cooling[, .(site, year, cooling, heating = 0)])
+  } else if(x$mtype == 'Heating'){
+    return(heating[, .(site, year, cooling = 0, heating)])
+  } else if(x$mtype == 'Baseload Only'){
+    return(dat[, .(cooling = 0, heating = 0), by = .(site, year(date))])
+  }
 }
 
