@@ -102,8 +102,13 @@ ebMeterFormat <- function(dat, inDate, ntbin, data_options) {
   dat <- dat[period > 0 & period < 4]
   pNames <- c('baseline', 'blackout', 'performance')
   dat[, period:= as.factor(pNames[period])]
-  towDict <- get_towDict()
-  dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
+  towDict <- get_towDict(data_options$interval)
+  if(data_options$interval == 'hourly') {
+    dat[, tow:= towDict[paste0(weekdays(date), hour(date))]]
+  } else if(data_options$interval == 'daily'){
+    dat[, tow:= towDict[paste0(weekdays(date))]]
+  }
+
   dat[, month:= month(date)]
   dat[, mm:= as.factor(month)]
   tcuts <- c(-Inf, quantile(dat$temp, 1:ntbin / ntbin))
@@ -424,14 +429,19 @@ get_tbins <- function(dat, tcuts, tbin_type){
 #' TOW Dictionary Helper
 #' @import data.table
 #' @export
-get_towDict <- function()
+get_towDict <- function(x)
 {
-  setNames(
-    1:168,
-    paste0(
-      rep(c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
-          each =  24),
-      rep(0:23, 7)))
+  if(x == 'hourly') {
+    dict = setNames(
+      1:168,
+      paste0(
+        rep(c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'),
+            each =  24),
+        rep(0:23, 7)))
+  } else if(x == 'daily') {
+    dict = setNames(1:7, c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'))
+  }
+  dict
 }
 
 
