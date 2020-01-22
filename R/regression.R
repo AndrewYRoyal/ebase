@@ -51,17 +51,26 @@ predict.regress <- function(mod, dat, ...)
   dat[, .(meterID, date, period, use, pUse)]
 }
 
+
 #' Forecast Method
 #' @import data.table
 #' @export
 ebForecast.regress <- function(model, dat, ...) {
   mod <- model$mod
   dat <- copy(dat)
-  towDict <- get_towDict()
-  dat <- dat[, .(date = date,
-                 temp = temp,
-                 tow = factor(towDict[paste0(weekdays(date), hour(date))], levels = mod$xlevels$tow),
-                 mm = as.factor(month(date)))]
+  interval = class(dat)[1]
+  towDict <- get_towDict(interval)
+  if(interval == 'hourly') {
+    dat <- dat[, .(date = date,
+                   temp = temp,
+                   tow = factor(towDict[paste0(weekdays(date), hour(date))], levels = mod$xlevels$tow),
+                   mm = as.factor(month(date)))]
+  } else if(interval == 'daily'){
+    dat <- dat[, .(date = date,
+                   temp = temp,
+                   tow = factor(towDict[weekdays(date)], levels = mod$xlevels$tow),
+                   mm = as.factor(month(date)))]
+  }
   tryCatch(
     {
       mmLevels <- setNames(mod$xlevels$mm, mod$xlevels$mm)
