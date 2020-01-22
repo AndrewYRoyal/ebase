@@ -2,7 +2,6 @@
 #' @import data.table
 #' @export
 ebSavings = function(x, deemed, groups = NULL, sites_subset = NULL) {
-  x = copy(elct_sum)
   dat = merge(
     x$sites$savings[, .(site, Gross = gross, var_gross)],
     x$sites$metrics[, .(site, Baseline = baseline)])

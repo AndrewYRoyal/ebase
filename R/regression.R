@@ -51,7 +51,6 @@ predict.regress <- function(mod, dat, ...)
   dat[, .(meterID, date, period, use, pUse)]
 }
 
-
 #' Forecast Method
 #' @import data.table
 #' @export
