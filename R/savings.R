@@ -66,7 +66,7 @@ ebSavings_ECM = function(x, site_dat, measures, reporting_subset = NULL) {
 #' Plot Savings
 #' @import data.table
 #' @export
-ebPlot.savings = function(x, units = 'kWh', label = FALSE) {
+ebPlot.savings = function(x, units = 'kWh', label = FALSE, label_nudge = 100) {
   dat = melt(x$raw[, -c('var_gross')], id.vars = c('id', 'norm'), value.name = 'use')
   dat[variable %in% c('Baseline', 'Deemed'), norm:= FALSE]
   dat = unique(na.omit(dat))
@@ -106,6 +106,6 @@ ebPlot.savings = function(x, units = 'kWh', label = FALSE) {
     geom_hline(yintercept = 0) +
     facet_wrap(~id, scale = 'free_x', ncol = 3)
 
-  if(label) return(GP + geom_label(fill = 'white', color = 'black', nudge_y = 100))
+  if(label) return(GP + geom_label(fill = 'white', color = 'black', nudge_y = label_nudge))
   GP
 }
