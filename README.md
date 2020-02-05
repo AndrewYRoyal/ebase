@@ -67,18 +67,18 @@ print(ebSample_deemed) # Engineering estimates for annual savings.
 #> Example Site 1 Example Site 2 
 #>           3000           1000
 print(ebSample_hourly)
-#>        meterID                date       use     temp
-#>     1:       B 2016-04-15 04:00:00 0.7501613 53.30387
-#>     2:       B 2016-04-15 05:00:00 0.7503226 51.45548
-#>     3:       B 2016-04-15 06:00:00 0.4000000 51.45839
-#>     4:       B 2016-04-15 07:00:00 0.1106452 55.98065
-#>     5:       B 2016-04-15 08:00:00 0.0450000 59.08923
-#>    ---                                               
-#> 68234:       C 2019-03-01 01:00:00 0.4011111 58.19000
-#> 68235:       C 2019-03-01 02:00:00 0.3986111 57.95333
-#> 68236:       C 2019-03-01 03:00:00 0.3986111 57.54667
-#> 68237:       C 2019-03-01 04:00:00 0.3991667 55.93000
-#> 68238:       C 2019-03-01 05:00:00 0.4005556 56.50000
+#>        meterID                date  use  temp
+#>     1:       A 2016-08-15 04:00:00 0.64 68.21
+#>     2:       A 2016-08-15 05:00:00 0.64 68.14
+#>     3:       A 2016-08-15 06:00:00 0.31 68.49
+#>     4:       A 2016-08-15 07:00:00 0.07 74.24
+#>     5:       A 2016-08-15 08:00:00 0.06 79.85
+#>    ---                                       
+#> 68234:       C 2019-03-01 01:00:00 0.40 58.19
+#> 68235:       C 2019-03-01 02:00:00 0.40 57.95
+#> 68236:       C 2019-03-01 03:00:00 0.40 57.55
+#> 68237:       C 2019-03-01 04:00:00 0.40 55.93
+#> 68238:       C 2019-03-01 05:00:00 0.40 56.50
 ```
 
 First, we format the hourly consumption data, dividing it into
@@ -106,20 +106,20 @@ names(data_formatted$stack())
 names(data_formatted$list())
 #> [1] "baseline"    "blackout"    "performance"
 names(data_formatted$list()[['baseline']])
-#> [1] "B" "C" "A"
+#> [1] "A" "B" "C"
 print(data_formatted$list()[['baseline']][['A']][, 1:5])
-#>       meterID                date       use     temp   period
-#>    1:       A 2016-08-15 04:00:00 0.6400000 68.21276 baseline
-#>    2:       A 2016-08-15 05:00:00 0.6395000 68.14000 baseline
-#>    3:       A 2016-08-15 06:00:00 0.3090000 68.48735 baseline
-#>    4:       A 2016-08-15 07:00:00 0.0707500 74.23700 baseline
-#>    5:       A 2016-08-15 08:00:00 0.0617500 79.85300 baseline
-#>   ---                                                        
-#> 8752:       A 2017-08-14 19:00:00 0.3623810 66.81714 baseline
-#> 8753:       A 2017-08-14 20:00:00 0.6811905 67.49973 baseline
-#> 8754:       A 2017-08-14 21:00:00 0.6802381 64.98286 baseline
-#> 8755:       A 2017-08-14 22:00:00 0.6845238 64.58286 baseline
-#> 8756:       A 2017-08-14 23:00:00 0.6804762 64.62143 baseline
+#>       meterID                date  use  temp   period
+#>    1:       A 2016-08-15 04:00:00 0.64 68.21 baseline
+#>    2:       A 2016-08-15 05:00:00 0.64 68.14 baseline
+#>    3:       A 2016-08-15 06:00:00 0.31 68.49 baseline
+#>    4:       A 2016-08-15 07:00:00 0.07 74.24 baseline
+#>    5:       A 2016-08-15 08:00:00 0.06 79.85 baseline
+#>   ---                                                
+#> 8752:       A 2017-08-14 19:00:00 0.36 66.82 baseline
+#> 8753:       A 2017-08-14 20:00:00 0.68 67.50 baseline
+#> 8754:       A 2017-08-14 21:00:00 0.68 64.98 baseline
+#> 8755:       A 2017-08-14 22:00:00 0.68 64.58 baseline
+#> 8756:       A 2017-08-14 23:00:00 0.68 64.62 baseline
 ```
 
 The `list()` formatting is useful when using `lapply()` to map a
@@ -137,18 +137,18 @@ model predict consumption (`pUse`) over all periods:
 ebModel(dat = data_formatted$list()[['baseline']][['A']]) %>%
   predict(data_formatted$stack('meter')[['A']])
 #> X
-#>        meterID                date      period       use       pUse
-#>     1:       A 2016-08-15 04:00:00    baseline 0.6400000 0.64311039
-#>     2:       A 2016-08-15 05:00:00    baseline 0.6395000 0.61836415
-#>     3:       A 2016-08-15 06:00:00    baseline 0.3090000 0.37841904
-#>     4:       A 2016-08-15 07:00:00    baseline 0.0707500 0.06359560
-#>     5:       A 2016-08-15 08:00:00    baseline 0.0617500 0.03531005
-#>    ---                                                             
-#> 21424:       A 2019-01-24 19:00:00 performance 0.4035714 0.58710930
-#> 21425:       A 2019-01-24 20:00:00 performance 0.4069048 0.72100235
-#> 21426:       A 2019-01-24 21:00:00 performance 0.4026190 0.75461848
-#> 21427:       A 2019-01-24 22:00:00 performance 0.4002381 0.72482788
-#> 21428:       A 2019-01-24 23:00:00 performance 0.3997619 0.72391385
+#>        meterID                date      period  use       pUse
+#>     1:       A 2016-08-15 04:00:00    baseline 0.64 0.64452052
+#>     2:       A 2016-08-15 05:00:00    baseline 0.64 0.61831530
+#>     3:       A 2016-08-15 06:00:00    baseline 0.31 0.37915549
+#>     4:       A 2016-08-15 07:00:00    baseline 0.07 0.06320861
+#>     5:       A 2016-08-15 08:00:00    baseline 0.06 0.03588094
+#>    ---                                                        
+#> 21424:       A 2019-01-24 19:00:00 performance 0.40 0.58693652
+#> 21425:       A 2019-01-24 20:00:00 performance 0.41 0.72135244
+#> 21426:       A 2019-01-24 21:00:00 performance 0.40 0.75441361
+#> 21427:       A 2019-01-24 22:00:00 performance 0.40 0.72579152
+#> 21428:       A 2019-01-24 23:00:00 performance 0.40 0.72414492
 ```
 
 ### Savings
@@ -168,13 +168,13 @@ lapply(data_formatted$list()[['baseline']], ebModel) %>%
 #> XXX
 #> $formatted
 #>                id Baseline Deemed Deemed/Baseline Gross RRate
-#> 1: Example Site 1    6,694  3,000            0.45 2,374  0.79
+#> 1: Example Site 1    6,692  3,000            0.45 2,372  0.79
 #> 2: Example Site 2    3,803  1,000            0.26 1,550  1.55
 #> 
 #> $raw
 #>                id  norm    Gross Baseline Deemed var_gross
-#> 1: Example Site 1 FALSE 2374.343 6694.216   3000 114023.42
-#> 2: Example Site 2 FALSE 1550.467 3802.650   1000  34779.22
+#> 1: Example Site 1 FALSE 2372.481  6692.47   3000  114110.2
+#> 2: Example Site 2 FALSE 1549.747  3802.73   1000   34774.0
 #> 
 #> attr(,"class")
 #> [1] "savings" "list"
@@ -197,15 +197,15 @@ lapply(data_formatted$list()[['baseline']], ebModel) %>%
 #> $meters
 #> $meters$metrics
 #>    meterID   r2 cvrmse  nmbe baseline
-#> 1:       A 0.92     22 1e-13 3324.284
-#> 2:       B 0.91     25 8e-14 3369.932
-#> 3:       C 0.92     24 1e-13 3802.650
+#> 1:       A 0.92     22 1e-13  3323.65
+#> 2:       B 0.91     25 1e-13  3368.82
+#> 3:       C 0.92     24 8e-14  3802.73
 #> 
 #> $meters$savings
 #>    meterID    gross var_gross
-#> 1:       A 1279.495  25883.46
-#> 2:       B 1094.847  30232.17
-#> 3:       C 1550.467  34779.22
+#> 1:       A 1278.293  25885.93
+#> 2:       B 1094.187  30266.52
+#> 3:       C 1549.747  34774.00
 #> 
 #> $meters$norms
 #> NULL
@@ -214,13 +214,13 @@ lapply(data_formatted$list()[['baseline']], ebModel) %>%
 #> $sites
 #> $sites$metrics
 #>              site   r2 cvrmse  nmbe baseline
-#> 1: Example Site 1 0.93     25 1e-13 6694.216
-#> 2: Example Site 2 0.92     24 1e-13 3802.650
+#> 1: Example Site 1 0.93     25 1e-13  6692.47
+#> 2: Example Site 2 0.92     24 8e-14  3802.73
 #> 
 #> $sites$savings
 #>              site    gross var_gross
-#> 1: Example Site 1 2374.343 114023.42
-#> 2: Example Site 2 1550.467  34779.22
+#> 1: Example Site 1 2372.481  114110.2
+#> 2: Example Site 2 1549.747   34774.0
 #> 
 #> $sites$norms
 #> NULL
