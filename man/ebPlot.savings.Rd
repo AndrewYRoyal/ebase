@@ -4,7 +4,8 @@
 \alias{ebPlot.savings}
 \title{Plot Savings}
 \usage{
-\method{ebPlot}{savings}(x, units = "kWh")
+\method{ebPlot}{savings}(x, units = "kWh", label = FALSE,
+  label_nudge = 100)
 }
 \description{
 Plot Savings
