@@ -376,7 +376,7 @@ ebPlot.data.table <- function(x, compress = TRUE) {
   if(compress) dat <- dat[, lapply(.SD, sum),
                           .SDcols = c('Actual', 'Predicted'),
                           by = .(date = as.POSIXct(trunc.POSIXt(date, 'days', tz = 'UTC'), tz = 'UTC'))]
-  dygraph(dat[, .(date, Actual, Predicted)], ylab = 'Daily kWh') %>%
+  dygraph(dat[, .(date, Actual, Predicted)], ylab = 'kWh') %>%
     dySeries("Actual", stepPlot = TRUE, fillGraph = TRUE, color = 'black') %>%
     dySeries("Predicted", strokeWidth = 1, stepPlot = TRUE, color = '#4889ce') %>%
     dyShading(from = datesV[3], to = datesV[4], color = "#CCEBD6") %>%

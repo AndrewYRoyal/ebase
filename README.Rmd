@@ -1,0 +1,123 @@
+---
+output: github_document
+always_allow_html: true
+fig_width: 2 
+fig_height: 1 
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# ebase
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+The `ebase` package provides an ensemble of tools to model and visualize metered energy data. 
+Its primary use-case is baseline modeling and savings calculations for net metered energy analysis,
+as it is used in M&V evaluation. However, the package also includes tools for other applications such as
+temperature profiling, loadpath cluster analysis and outlier detection.
+
+## Installation
+
+You can install the development version from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("AndrewYRoyal/ebase")
+```
+
+## Example
+
+This is a example which shows how to use `ebase` to
+
+1. Estimate a baseline model of metered consumption prior to a measure installation,
+2. Use the baseline model to predict consumption before and after the installation, and
+3. Use the predictions to calculate savings associated with the measure(s).
+
+
+```{r example}
+library(ebase)
+library(magrittr)
+library(data.table)
+```
+
+### Data
+The package includes sample two years hourly metered data for two simulated sites. Each meter
+is assigned a simulated measure installation date. In the example below, we calculate energy
+savings realized over the 365 days following the installation dates.
+
+```{r}
+print(ebSample_sites)
+print(ebSample_install_dates)
+print(ebSample_deemed) # Engineering estimates for annual savings.
+print(ebSample_hourly)
+
+```
+
+First, we format the hourly consumption data, dividing it into basleline,
+blackout and performance periods that signify the time intervals before, during and after the measure installations.
+
+```{r}
+data_formatted = ebDataFormat(x = ebSample_hourly,
+                              install_dates = ebSample_install_dates,
+                              sites = ebSample_sites)
+```
+
+The resulting object can be used to return different versions of formatted data. This can
+be achieved using the `stack()` or `list()` methods. The `stack()` method creates a list of `data.table`
+objects, one for each period, where each table includes (stacks) readings from all meters. The
+`list()` method returns a list of lists, where each item contains a `data.table` object for the
+meter-period pairing.
+
+```{r}
+names(data_formatted$stack())
+names(data_formatted$list())
+names(data_formatted$list()[['baseline']])
+print(data_formatted$list()[['baseline']][['A']][, 1:5])
+```
+
+The `list()` formatting is useful when using `lapply()` to map a function over the entire set of meters,
+as we do when fitting models.
+
+### Modeling
+
+To estimate model, we simply use the invoke the `ebModel()` function on the desired subset of formatted
+data. We can then use the resulting model to generate a predictions. The following code estimates a model using meter A's baseline period consumption (`use`), and then uses the model predict consumption (`pUse`) over all periods:
+
+```{r}
+ebModel(dat = data_formatted$list()[['baseline']][['A']]) %>%
+  predict(data_formatted$stack('meter')[['A']])
+
+```
+
+### Savings
+
+To estimate total savings from measures, we must generate models and predictions for all three meters. This is best achieved using the `lapply()` function to map `ebModel` to all baseline meter data. The `ebPredict()` simplifies the prediction process for multiple meters. Lastly `ebSummary` and `ebSavings()` summarize the model predictions and calculate savings:
+
+```{r}
+lapply(data_formatted$list()[['baseline']], ebModel) %>%
+  ebPredict(data_formatted) %>%
+  ebSummary %>%
+  ebSavings(deemed = ebSample_deemed)
+```
+The results show that the measures achieved savings of 2,374 kWh and 1,550 at the two sites, signifying realization rates of 0.79 and 1.55 when compared to deemed savings. Energy savings and loadpaths can be visualized using the `ebPlot()` function. 
+
+Lastly, the intermediate `ebSummary()` function can be used to evaluate metrics that indicate the quality of the models at the meter and site level (such as CVRMSE):
+```{r}
+lapply(data_formatted$list()[['baseline']], ebModel) %>%
+  ebPredict(data_formatted) %>%
+  ebSummary 
+```
+
+
+
+
