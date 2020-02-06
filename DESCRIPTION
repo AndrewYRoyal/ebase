@@ -17,7 +17,8 @@ Imports:
   data.table,
   ggplot2,
   dygraphs,
-  magrittr
+  magrittr, 
+  rnoaa
 Suggests:
     mlr,
     parallelMap,
