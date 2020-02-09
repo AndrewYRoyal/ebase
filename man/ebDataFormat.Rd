@@ -7,6 +7,21 @@
 ebDataFormat(x, install_dates = NULL, sites = NULL, norm_data = NULL,
   data_options = NULL, temp_bins = NULL, cpus = 1)
 }
+\arguments{
+  \item{x}{A data.table containing hourly- or daily-interval metered consumption values. Columns include
+  ``meterID'', ``date'', ``use'' and ``temp.'' The ``date'' column should be formatted as the POSIXct class.}
+  \item{install_dates}{(optional) A named list of install dates, where the names correspond to meterID values.
+  List entries can be a POSIXct vector of length one or two. Two-element vectors represent an install date interval,
+  where the first element represents the begin date and the second element the ending date.}
+  \item{sites}{(optional)  A named vector used to lookup the site of each meter.}
+  \item{norm_data}{(optional)  A data.table containing hourly- or daily-interval temperature normals.}
+  \item{data_options}{(optional) A list of options to customize data formatting (more details below).}
+  \item{temp_bins}{(optional) A named list that indicates how many temperature bins to assign to each meter.
+  The default is to assign 10 temperature bins to each meter.}
+  \item{cpus}{The number of CPUs to use to process data.}
+}
 \description{
-Data Format
+Data Format prepares data for NMEC analysis. Its fundemental purpose is to (1) divide metered consumption data into
+baseline, blackout and performance periods, (2) create variables required by NMEC models and (3) consolidate
+meter metadata used by other ebase functions.
 }
