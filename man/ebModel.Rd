@@ -7,6 +7,36 @@
 ebModel(dat, method = c("regress", "gboost", "rforest", "caltrack",
   "hybrid"), model_options = NULL)
 }
+\arguments{
+\item{dat}{Formatted consumption data.table of class ``hourly'' or ``daily.''}
+\item{method}{The model type, including a simple TOWT regression (regression), the CalTRACK Hourly 
+method (caltrack) or a tree-based machine learning model (rforest and gboost).}
+\item{model_options}{(optional) A named list stipulating additional model estimation methods or hyperparameters (see more below).}
+}
 \description{
-Baseline Model
+Estimates a baseline model of energy consumption.
+}
+\value{
+A model that can be used by the \code{predict} function to predict energy consumption using a data.table
+of class ``hourly'' or ``daily.''
+
+The \code{model_options} argument lists the hyperparameter space for tuning the gboost and rforest models
+(max_depth, nrounds, eta, ntree), the number of folds used for cross-validation (blocks) and whether
+to block folds on weekly intervals (block_on_week). The options also allow stipulation of a weighting
+variable (weight) and a character vector listing the independent variables to include in the model (ivars). 
+Supplying ivars explicitly is required for gboost and rforest models. Lastly, custom_lm allows the user to stipulate 
+a custom formula for the regression method. The default values are as follows:
+
+\code{model_defaults = list(max_depth = 3,
+nrounds = seq(200, 1400, 200),
+ntree = 1:5 * 50,
+early_stopping_rounds = 200,
+eta = 0.1,
+blocks = 2,
+block_on_week = FALSE,
+weights = NULL,
+occupancy_lookup = FALSE,
+ivars = NULL,
+custom_lm = NULL)}
+
 }

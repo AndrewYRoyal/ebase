@@ -6,6 +6,24 @@
 \usage{
 ebPredict(modelList, dataList)
 }
+\arguments{
+\item{modelList}{A named list of models, created using \code{ebModel}. The names should correspond
+to the meterID values associated with each model.}
+\item{dataList}{A formatted data object created using \code{ebDataFormat}. The list of meters
+contained in the \code{modelList} should be identical to that contained in the \code{dataList}.}
+}
 \description{
-Predictions
+ebPredict simplifies the process of using a list of models to generate predictions for all the 
+meters and periods contained in a formatted data object. 
+}
+\value{
+An object containing \code{stack} and \code{list} methods that returns a combined data.table of formatted
+meter interval data or a list of individal meter data tables. The tables each contain a \code{pUse} column
+that represents predicted consumption.
+
+Predictions for individual meters can be visualized with dynamic plots using the \code{ebPlot} function. For instance,
+suppose \code{output = ebPredict(modelList, dataList)} and we wish to visualize predictions for meterID ``A.'' 
+To do so, we simply run the code \code{ebPlot(output$stack(level = 'meter')[['A']])}.
+
+}
 }

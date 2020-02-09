@@ -54,8 +54,7 @@ ebGapFill <- function(dat, interval = c("hour", "day"), id_var = "meterID") {
 #' QC Check on Use Data
 #' @import data.table
 #' @export
-ebQC <- function(dataList)
-{
+ebQC <- function(dataList) {
   dupCountDict = sapply(dataList, function(dat) sum(duplicated(dat)))
   naPctDict = sapply(dataList, function(dat) round(100 * dat[, sum(is.na(use)) / .N], 2))
 

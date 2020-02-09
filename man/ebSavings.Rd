@@ -9,3 +9,12 @@ ebSavings(x, deemed, groups = NULL, sites_subset = NULL)
 \description{
 Format Savings from Summary Object
 }
+\arguments{
+\item{x}{Output from the \code{ebSummary} object.}
+\item{deemed}{A named character vector reporting deemed savings estimates for each site.}
+\item{groups}{(optional)A named character vector assigning sites to groups. If supplied, savings the output
+is aggregated at the group-level}
+\item{sites_subset}{(optional) A subset of the }
+}
+\value{A table that compares gross NMEC and deemed savings at the site- or group-level. The output can
+be visualized using the \code{ebPlot} function.}

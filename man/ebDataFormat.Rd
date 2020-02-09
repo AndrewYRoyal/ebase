@@ -25,3 +25,26 @@ Data Format prepares data for NMEC analysis. Its fundemental purpose is to (1) d
 baseline, blackout and performance periods, (2) create variables required by NMEC models and (3) consolidate
 meter metadata used by other ebase functions.
 }
+\value{
+An object containing \code{stack} and \code{list} methods that returns a combined data.table of formatted
+meter interval data or a list of individal meter data tables.
+
+The data_options list stipulates the consumption interval length (hourly/daily), the minimum and maximum
+number of days in the baseline and performance periods, the temperature bin type (simple/detailed/none) and
+whether to generate an occupancy variable. Meters that do not meet the performance and baseline length
+requirements are removed from the formatted data output.
+
+The default \code{data_options} are as follows:
+
+\code{
+data_options = list(interval = 'hourly',
+base_length = 365,
+perf_length = 365,
+blackout = 0,
+base_min = 0,
+perf_min = 0,
+tbin_type = 'simple',
+occupancy_lookup = FALSE)
+}
+}
+
