@@ -88,7 +88,7 @@ ebPlot.savings = function(x, units = 'kWh', label = FALSE, label_nudge = 100) {
                               y = use,
                               color = variable,
                               fill = variable,
-                              label = rr,
+                              label = format(round(use), big.mark = ','),
                               ymin = use - 1.96 * sqrt(var_gross),
                               ymax = use + 1.96 * sqrt(var_gross))) +
     theme_minimal() +
@@ -96,10 +96,8 @@ ebPlot.savings = function(x, units = 'kWh', label = FALSE, label_nudge = 100) {
     theme(panel.grid = element_blank()) +
     geom_bar(stat = 'identity') +
     geom_errorbar(color = 'black', position = 'dodge', width = 0.5) +
-    scale_fill_manual('', values = colors_v,
-                      labels = labels_v) +
-    scale_color_manual('', values = colors_v,
-                       labels = labels_v) +
+    scale_fill_manual('', values = colors_v, labels = labels_v) +
+    scale_color_manual('', values = colors_v, labels = labels_v) +
     scale_x_discrete('') +
     scale_y_continuous(sprintf("%s ('000)", units)) +
     coord_flip() +
