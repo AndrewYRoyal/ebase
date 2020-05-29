@@ -48,40 +48,47 @@ ebDataFormat <- function(
   sites <- sites[names(sites) %in% meterDict]
   periods = names(dataList[[1]])
   names(periods) = periods
-  list(
-    stack = function(level = 'period') dstack(dataList, periods, level),
-    list = function(level = 'period') dlist(dataList, periods, level),
+  out = list(
+    data = dataList,
     norms = norm_data,
     meterDict = meterDict,
     siteDict = sites,
     periods = periods)
-
+  setattr(out, "class", c('ebFormatted', 'list'))
+  out
 }
+
+# stack = function(level = 'period') dstack(dataList, periods, level),
+# list = function(level = 'period') dlist(dataList, periods, level),
+
+ebStack <- function(x, ...) UseMethod('ebStack')
 
 #' Data Stack Method
 #' @import data.table
 #' @export
-dstack = function(dataList, periods, level) {
-  if(level == 'meter') {
-    lapply(dataList, rbindlist)
-  } else if(level == 'period') {
-    lapply(periods, function(period) {
-      meterDict = setNames(names(dataList), names(dataList))
-      rbindlist(lapply(meterDict, function(meter) dataList[[meter]][[period]]))
+ebStack.ebFormatted = function(x, by = 'meter') {
+  if(by == 'meter') {
+    lapply(x$data, rbindlist)
+  } else if(by == 'period') {
+    lapply(x$periods, function(period) {
+      meters = setNames(names(x$data), names(x$data))
+      rbindlist(lapply(meters, function(meter) x$data[[meter]][[period]]))
     })
   }
 }
 
+ebList <- function(x, ...) UseMethod('ebList')
+
 #' Data List Method
 #' @import data.table
 #' @export
-dlist = function(dataList, periods, level) {
-  if(level == 'meter') {
-    dataList
-  } else if(level == 'period') {
-    meterDict = setNames(names(dataList), names(dataList))
-    lapply(periods, function(period) {
-      lapply(meterDict, function(meter) dataList[[meter]][[period]])
+ebList.ebFormatted = function(x, top = 'period') {
+  if(top == 'meter') {
+    x$data
+  } else if(top == 'period') {
+    meters = setNames(names(x$data), names(x$data))
+    lapply(x$periods, function(period) {
+      lapply(meters, function(meter) x$data[[meter]][[period]])
     })
   }
 }
@@ -167,7 +174,7 @@ ebPredict = function(modelList, dataList) {
   siteDict = dataList$siteDict
   periods = dataList$periods
   norms = dataList$norms
-  dataList = dataList$stack('meter')
+  dataList = ebStack(dataList)
   dataList = lapply(meterDict, function(meter) predict(modelList[[meter]], dataList[[meter]]))
   dataList = lapply(dataList, split, by = 'period')
   norm_predict = NULL
@@ -181,11 +188,11 @@ ebPredict = function(modelList, dataList) {
     }
   }
   out = list(
-    stack = function(level = 'period') dstack(dataList, periods, level),
-    list = function(level = 'period') dlist(dataList, periods, level),
+    data = dataList,
     site_dat = data.table(site = as.factor(siteDict), meterID = names(siteDict)),
-    norm_predict = norm_predict)
-  setattr(out, 'class', c('prediction', class(out)))
+    norm_predict = norm_predict,
+    periods = periods)
+  setattr(out, 'class', c('prediction', 'ebFormatted', class(out)))
   out
 }
 
@@ -199,14 +206,16 @@ ebSummary <- function(x, ...) UseMethod('ebSummary')
 #' @import data.table
 #' @export
 ebSummary.prediction = function(x, norm_modelList = NULL) {
-  meter_baseline = merge(x$site_dat,
-                         x$stack()[['baseline']],
-                         by = 'meterID')
+  meter_baseline = merge(
+    x$site_dat,
+    ebStack(x, 'period')[['baseline']],
+    by = 'meterID')
   site_baseline = meter_baseline[, lapply(.SD, sum),
                                  by = .(site, date),
                                  .SDcols = c('use', 'pUse')]
-  meter_perf = merge(x$site_dat,
-                     x$stack()[['performance']])
+  meter_perf = merge(
+    x$site_dat,
+    ebStack(x, 'period')[['performance']])
   site_perf = meter_perf[, lapply(.SD, sum),
                          by = .(site, date),
                          .SDcols = c('use', 'pUse')]
