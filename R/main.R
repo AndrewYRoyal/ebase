@@ -58,9 +58,8 @@ ebDataFormat <- function(
   out
 }
 
-# stack = function(level = 'period') dstack(dataList, periods, level),
-# list = function(level = 'period') dlist(dataList, periods, level),
-
+#' Stack Formatted Data
+#' @export
 ebStack <- function(x, ...) UseMethod('ebStack')
 
 #' Data Stack Method
@@ -77,6 +76,8 @@ ebStack.ebFormatted = function(x, by = 'meter') {
   }
 }
 
+#' List Formatted Data
+#' @export
 ebList <- function(x, ...) UseMethod('ebList')
 
 #' Data List Method
