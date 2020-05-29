@@ -15,6 +15,9 @@ knitr::opts_chunk$set(
   out.width = "100%"
 )
 ```
+```{r, include = FALSE}
+options(warn=-1)
+```
 
 # ebase
 
@@ -95,8 +98,9 @@ To estimate model, we simply use the invoke the `ebModel()` function on the desi
 data. We can then use the resulting model to generate a predictions. The following code estimates a model using meter A's baseline period consumption (`use`), and then uses the model predict consumption (`pUse`) over all periods:
 
 ```{r}
-ebModel(dat = ebList(data_formatted)[['baseline']][['A']]) %>%
-  predict(data_formatted$stack('meter')[['A']])
+ebList(data_formatted)[['baseline']][['A']] %>%
+  ebModel %>%
+  predict(ebStack(data_formatted)[['A']])
 
 ```
 
@@ -105,7 +109,8 @@ ebModel(dat = ebList(data_formatted)[['baseline']][['A']]) %>%
 To estimate total savings from measures, we must generate models and predictions for all three meters. This is best achieved using the `lapply()` function to map `ebModel` to all baseline meter data. The `ebPredict()` simplifies the prediction process for multiple meters. Lastly `ebSummary` and `ebSavings()` summarize the model predictions and calculate savings:
 
 ```{r}
-lapply(ebList(data_formatted)[['baseline']], ebModel) %>%
+ebList(data_formatted)[['baseline']] %>%
+  lapply(ebModel) %>%
   ebPredict(data_formatted) %>%
   ebSummary %>%
   ebSavings(deemed = ebSample_deemed)
@@ -114,7 +119,8 @@ The results show that the measures achieved savings of 2,374 kWh and 1,550 at th
 
 Lastly, the intermediate `ebSummary()` function can be used to evaluate metrics that indicate the quality of the models at the meter and site level (such as CVRMSE):
 ```{r}
-lapply(ebList(data_formatted)[['baseline']], ebModel) %>%
+ebList(data_formatted)[['baseline']] %>%
+  lapply(ebModel) %>%
   ebPredict(data_formatted) %>%
   ebSummary 
 ```

@@ -86,28 +86,29 @@ basleline, blackout and performance periods that signify the time
 intervals before, during and after the measure installations.
 
 ``` r
-data_formatted = ebDataFormat(x = ebSample_hourly,
-                              install_dates = ebSample_install_dates,
-                              sites = ebSample_sites)
+data_formatted = ebDataFormat(
+  x = ebSample_hourly,
+  install_dates = ebSample_install_dates,
+  sites = ebSample_sites)
 #> 3 total meters 
 #> 3 with sufficient data
 ```
 
 The resulting object can be used to return different versions of
-formatted data. This can be achieved using the `stack()` or `list()`
-methods. The `stack()` method creates a list of `data.table` objects,
+formatted data. This can be achieved using the `ebStack()` or `ebList()`
+methods. The `ebStack()` method creates a list of `data.table` objects,
 one for each period, where each table includes (stacks) readings from
-all meters. The `list()` method returns a list of lists, where each item
-contains a `data.table` object for the meter-period pairing.
+all meters. The `ebList()` method returns a list of lists, where each
+item contains a `data.table` object for the meter-period pairing.
 
 ``` r
-names(data_formatted$stack())
-#> [1] "baseline"    "blackout"    "performance"
-names(data_formatted$list())
-#> [1] "baseline"    "blackout"    "performance"
-names(data_formatted$list()[['baseline']])
+names(ebStack(data_formatted))
 #> [1] "A" "B" "C"
-print(data_formatted$list()[['baseline']][['A']][, 1:5])
+names(ebList(data_formatted))
+#> [1] "baseline"    "blackout"    "performance"
+names(ebList(data_formatted)[['baseline']])
+#> [1] "A" "B" "C"
+print(ebList(data_formatted)[['baseline']][['A']][, 1:5])
 #>       meterID                date  use  temp   period
 #>    1:       A 2016-08-15 04:00:00 0.64 68.21 baseline
 #>    2:       A 2016-08-15 05:00:00 0.64 68.14 baseline
@@ -122,7 +123,7 @@ print(data_formatted$list()[['baseline']][['A']][, 1:5])
 #> 8756:       A 2017-08-14 23:00:00 0.68 64.62 baseline
 ```
 
-The `list()` formatting is useful when using `lapply()` to map a
+The `ebList()` formatting is useful when using `lapply()` to map a
 function over the entire set of meters, as we do when fitting models.
 
 ### Modeling
@@ -134,8 +135,9 @@ using meter A’s baseline period consumption (`use`), and then uses the
 model predict consumption (`pUse`) over all periods:
 
 ``` r
-ebModel(dat = data_formatted$list()[['baseline']][['A']]) %>%
-  predict(data_formatted$stack('meter')[['A']])
+ebList(data_formatted)[['baseline']][['A']] %>%
+  ebModel %>%
+  predict(ebStack(data_formatted)[['A']])
 #> X
 #>        meterID                date      period  use       pUse
 #>     1:       A 2016-08-15 04:00:00    baseline 0.64 0.64452052
@@ -161,7 +163,8 @@ Lastly `ebSummary` and `ebSavings()` summarize the model predictions and
 calculate savings:
 
 ``` r
-lapply(data_formatted$list()[['baseline']], ebModel) %>%
+ebList(data_formatted)[['baseline']] %>%
+  lapply(ebModel) %>%
   ebPredict(data_formatted) %>%
   ebSummary %>%
   ebSavings(deemed = ebSample_deemed)
@@ -190,7 +193,8 @@ metrics that indicate the quality of the models at the meter and site
 level (such as CVRMSE):
 
 ``` r
-lapply(data_formatted$list()[['baseline']], ebModel) %>%
+ebList(data_formatted)[['baseline']] %>%
+  lapply(ebModel) %>%
   ebPredict(data_formatted) %>%
   ebSummary 
 #> XXX
