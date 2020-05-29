@@ -6,13 +6,6 @@
 \usage{
 \method{ebSummary}{prediction}(x, norm_modelList = NULL)
 }
-\arguments{
-\item{x}{Output from the \code{ebPredict} function.}
-\item{norm_modelList}{(optional) A list of models created using weather normal data.}
-}
 \description{
-Uses predictions to return model metrics and savings estimates at the meter- and site-levels.
-}
-\value{
-A set of data.tables that report model metrics (CVRMSE, R2, NMBE) and savings estimates.
+Prediction and Savings Summary
 }
