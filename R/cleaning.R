@@ -122,8 +122,7 @@ translate_temp <- Vectorize(FUN = function(x)
 #' @import data.table
 #' @import rnoaa
 #' @export
-ebWeather = function(station, start_year, end_year = year(Sys.time()), time_zone = 'PST')
-{
+ebWeather = function(station, start_year, end_year = year(Sys.time()), time_zone = 'PST', impute_missing = TRUE) {
   station = strsplit(station, '-')[[1]]
   tryCatch({
     dat <- rbindlist(
@@ -147,9 +146,11 @@ ebWeather = function(station, start_year, end_year = year(Sys.time()), time_zone
     dat <- ebGapFill(dat, id_var = 'station')
     msng <- sum(is.na(dat$temp))
     cat(msng, sprintf('(%s pct)', round(100 * msng / length(dat$temp), 1)),
-        'missing values for station',
-        paste0(station, collapse = '-'),
-        '\n')
-    ebImpute(dat, value = 'temp')
+        'missing values for station', paste0(station, collapse = '-'), '\n')
+    if(impute_missing) {
+      ebImpute(dat, value = 'temp')
+    } else {
+      dat
+    }
   }, error = function(e) cat(paste0(station, collapse = '-'), 'Not Available \n'))
 }
