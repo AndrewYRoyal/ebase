@@ -126,7 +126,7 @@ ebHourlyTempFacet <- function(dat, hours = c(0:11 * 2))
 #' @export
 
 predict.tprofile = function(x, dat) {
-  min_use = min(x$dat$use)
+  min_use = unname(x$model$coefficients['(Intercept)'])
   dat = dat[, .(site, date, hd = pmax(x$bh - temp, 0), cd = pmax(temp - x$bc, 0))]
   dat[, p_use:= predict(x$model, dat)]
 

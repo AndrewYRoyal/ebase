@@ -399,8 +399,7 @@ ebPlot.data.table <- function(x, compress = TRUE) {
 #' Reduce size of linear model
 #' @import data.table
 #' @export
-strip_lm = function(x)
-{
+strip_lm = function(x) {
   x$data <- NULL
   x$y <- NULL
   x$linear.predictors <- NULL
