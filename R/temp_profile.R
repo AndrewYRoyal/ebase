@@ -121,7 +121,7 @@ ebHourlyTempFacet <- function(dat, hours = c(0:11 * 2))
     facet_wrap(~hour)
 }
 
-#' Predict site-year heating and cooling load
+#' Predict daily heating and cooling load
 #' @import data.table
 #' @export
 
@@ -129,18 +129,10 @@ predict.tprofile = function(x, dat) {
   min_use = unname(x$model$coefficients['(Intercept)'])
   dat = dat[, .(site, date, hd = pmax(x$bh - temp, 0), cd = pmax(temp - x$bc, 0))]
   dat[, p_use:= predict(x$model, dat)]
-
-  cooling = dat[cd > 0, .(cooling = sum(p_use - min_use)), by = .(site, year(date))]
-  heating = dat[hd > 0, .(heating = sum(p_use - min_use)), by = .(site, year(date))]
-
-  if(x$mtype == 'Heating and Cooling') {
-    return(merge(cooling, heating, by = c('site', 'year')))
-  } else if(x$mtype == 'Cooling'){
-    return(cooling[, .(site, year, cooling, heating = 0)])
-  } else if(x$mtype == 'Heating'){
-    return(heating[, .(site, year, cooling = 0, heating)])
-  } else if(x$mtype == 'Baseload Only'){
-    return(dat[, .(cooling = 0, heating = 0), by = .(site, year(date))])
-  }
+  dat[cd > 0, cooling:= p_use - min_use]
+  dat[cd == 0, cooling:= 0]
+  dat[hd > 0, heating:= p_use - min_use]
+  dat[hd == 0, heating:= 0]
+  dat[, .(site, date, cooling, heating)]
 }
 
